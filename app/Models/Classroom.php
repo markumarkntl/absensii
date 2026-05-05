@@ -8,7 +8,15 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Classroom extends Model
 {
-    protected $fillable = ['nama_kelas', 'jurusan', 'academic_year_id'];
+    protected $fillable = [
+        'name',
+        'academic_year_id',
+        'wali_kelas',
+    ];
+
+    // -------------------------------------------------------------------------
+    // Relasi
+    // -------------------------------------------------------------------------
 
     public function academicYear(): BelongsTo
     {

@@ -11,15 +11,26 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
-    $middleware->web(append: [
-        \App\Http\Middleware\HandleInertiaRequests::class,
-    ]);
+        $middleware->web(append: [
+            \App\Http\Middleware\HandleInertiaRequests::class,
+            \Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets::class,
+        ]);
 
-    // Tambahkan alias middleware
-    $middleware->alias([
-        'role' => \Spatie\Permission\Middleware\RoleMiddleware::class,
-    ]);
-})
-    ->withExceptions(function (Exceptions $exceptions): void {
+        // Alias middleware role (dari EnsureHasRole atau Spatie)
+        $middleware->alias([
+            'role' => \Spatie\Permission\Middleware\RoleMiddleware::class,
+        ]);
+    })
+    ->withSchedule(function (\Illuminate\Console\Scheduling\Schedule $schedule) {
+        // Auto-tandai siswa Alfa setiap hari Senin–Jumat pukul 08:05
+        // (5 menit setelah deadline absen pukul 08:00)
+        $schedule->command('sass:mark-absent')
+                 ->weekdays()
+                 ->dailyAt('08:05')
+                 ->withoutOverlapping()
+                 ->runInBackground()
+                 ->appendOutputTo(storage_path('logs/mark-absent.log'));
+    })
+    ->withExceptions(function (Exceptions $exceptions) {
         //
     })->create();

@@ -131,7 +131,7 @@ function Sidebar({ collapsed, setCollapsed, mobileOpen, setMobileOpen }) {
     );
 
     return (
-        <>
+        <> 
             {/* Desktop Sidebar */}
             <aside className={`hidden lg:flex flex-col flex-shrink-0 h-screen sticky top-0
                                transition-all duration-300 ease-in-out
