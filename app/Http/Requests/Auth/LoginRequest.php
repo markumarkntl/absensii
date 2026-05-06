@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Auth;
 
+use App\Models\StudentDetail;
 use Illuminate\Auth\Events\Lockout;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
@@ -28,13 +29,28 @@ class LoginRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'email' => ['required', 'string', 'email'],
-            'password' => ['required', 'string'],
+            // 'identifier' bisa berupa email (admin) atau NISN (siswa)
+            'identifier' => ['required', 'string'],
+            'password'   => ['required', 'string'],
+        ];
+    }
+
+    /**
+     * Custom attribute names for validation messages.
+     */
+    public function attributes(): array
+    {
+        return [
+            'identifier' => 'email / NISN',
         ];
     }
 
     /**
      * Attempt to authenticate the request's credentials.
+     *
+     * Deteksi otomatis:
+     *  - Mengandung '@'  → login sebagai Admin via email
+     *  - Tidak ada '@'   → login sebagai Siswa via NISN
      *
      * @throws ValidationException
      */
@@ -42,15 +58,57 @@ class LoginRequest extends FormRequest
     {
         $this->ensureIsNotRateLimited();
 
-        if (! Auth::attempt($this->only('email', 'password'), $this->boolean('remember'))) {
+        $identifier = $this->string('identifier')->toString();
+        $password   = $this->string('password')->toString();
+
+        $authenticated = str_contains($identifier, '@')
+            ? $this->attemptAdminLogin($identifier, $password)
+            : $this->attemptStudentLogin($identifier, $password);
+
+        if (! $authenticated) {
             RateLimiter::hit($this->throttleKey());
 
             throw ValidationException::withMessages([
-                'email' => trans('auth.failed'),
+                'identifier' => trans('auth.failed'),
             ]);
         }
 
         RateLimiter::clear($this->throttleKey());
+    }
+
+    /**
+     * Login Admin menggunakan email + password.
+     */
+    private function attemptAdminLogin(string $email, string $password): bool
+    {
+        return Auth::attempt(
+            ['email' => $email, 'password' => $password],
+            $this->boolean('remember')
+        );
+    }
+
+    /**
+     * Login Siswa menggunakan NISN + password.
+     *
+     * Alur:
+     *  1. Cari NISN di tabel student_details
+     *  2. Ambil user yang terhubung
+     *  3. Verifikasi password user tersebut
+     */
+    private function attemptStudentLogin(string $nisn, string $password): bool
+    {
+        $studentDetail = StudentDetail::where('nisn', $nisn)
+            ->with('user')
+            ->first();
+
+        if (! $studentDetail || ! $studentDetail->user) {
+            return false;
+        }
+
+        return Auth::attempt(
+            ['email' => $studentDetail->user->email, 'password' => $password],
+            $this->boolean('remember')
+        );
     }
 
     /**
@@ -69,7 +127,7 @@ class LoginRequest extends FormRequest
         $seconds = RateLimiter::availableIn($this->throttleKey());
 
         throw ValidationException::withMessages([
-            'email' => trans('auth.throttle', [
+            'identifier' => trans('auth.throttle', [
                 'seconds' => $seconds,
                 'minutes' => ceil($seconds / 60),
             ]),
@@ -78,9 +136,12 @@ class LoginRequest extends FormRequest
 
     /**
      * Get the rate limiting throttle key for the request.
+     * Gunakan 'identifier' (bukan 'email') sebagai basis throttle key.
      */
     public function throttleKey(): string
     {
-        return Str::transliterate(Str::lower($this->string('email')).'|'.$this->ip());
+        return Str::transliterate(
+            Str::lower($this->string('identifier')) . '|' . $this->ip()
+        );
     }
 }

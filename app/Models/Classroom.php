@@ -9,14 +9,10 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class Classroom extends Model
 {
     protected $fillable = [
-        'name',
+        'nama_kelas',
+        'jurusan',
         'academic_year_id',
-        'wali_kelas',
     ];
-
-    // -------------------------------------------------------------------------
-    // Relasi
-    // -------------------------------------------------------------------------
 
     public function academicYear(): BelongsTo
     {
@@ -26,5 +22,13 @@ class Classroom extends Model
     public function students(): HasMany
     {
         return $this->hasMany(StudentDetail::class);
+    }
+
+    /**
+     * Jumlah siswa di kelas ini.
+     */
+    public function getStudentCountAttribute(): int
+    {
+        return $this->students()->count();
     }
 }

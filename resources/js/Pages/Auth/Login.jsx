@@ -1,8 +1,8 @@
-import { Head, Link, useForm } from '@inertiajs/react';
+import { Head, useForm } from '@inertiajs/react';
 
-export default function Login({ status, canResetPassword }) {
+export default function Login({ status }) {
     const { data, setData, post, processing, errors, reset } = useForm({
-        email: '',
+        identifier: '',
         password: '',
         remember: false,
     });
@@ -101,10 +101,13 @@ export default function Login({ status, canResetPassword }) {
                         {/* Heading */}
                         <div className="mb-8">
                             <h2 className="text-2xl font-bold text-gray-900">Selamat datang!</h2>
-                            <p className="text-gray-500 text-sm mt-1">Masuk ke akun SASS kamu untuk melanjutkan.</p>
+                            <p className="text-gray-500 text-sm mt-1">
+                                Masuk menggunakan <span className="font-medium text-gray-700">email</span> (Admin) atau{' '}
+                                <span className="font-medium text-gray-700">NISN</span> (Siswa).
+                            </p>
                         </div>
 
-                        {/* Flash status (misal: password reset berhasil) */}
+                        {/* Flash status */}
                         {status && (
                             <div className="mb-6 flex items-start gap-3 p-4 bg-green-50 border border-green-200 rounded-xl">
                                 <svg className="w-5 h-5 text-green-500 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -117,31 +120,31 @@ export default function Login({ status, canResetPassword }) {
                         {/* Form */}
                         <form onSubmit={submit} className="space-y-5">
 
-                            {/* Email */}
+                            {/* Identifier: Email atau NISN */}
                             <div>
-                                <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1.5">
-                                    Email
+                                <label htmlFor="identifier" className="block text-sm font-medium text-gray-700 mb-1.5">
+                                    Email / NISN
                                 </label>
                                 <input
-                                    id="email"
-                                    type="email"
-                                    name="email"
-                                    value={data.email}
+                                    id="identifier"
+                                    type="text"
+                                    name="identifier"
+                                    value={data.identifier}
                                     autoComplete="username"
                                     autoFocus
-                                    onChange={(e) => setData('email', e.target.value)}
-                                    placeholder="nama@sekolah.sch.id"
+                                    onChange={(e) => setData('identifier', e.target.value)}
+                                    placeholder="Email admin atau NISN siswa"
                                     className={`w-full px-4 py-2.5 rounded-xl border text-sm text-gray-900 placeholder-gray-400
                                         bg-white transition-colors outline-none
                                         focus:ring-2 focus:ring-blue-500 focus:border-blue-500
-                                        ${errors.email ? 'border-red-400 bg-red-50' : 'border-gray-300'}`}
+                                        ${errors.identifier ? 'border-red-400 bg-red-50' : 'border-gray-300'}`}
                                 />
-                                {errors.email && (
+                                {errors.identifier && (
                                     <p className="mt-1.5 text-xs text-red-600 flex items-center gap-1">
                                         <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
                                             <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
                                         </svg>
-                                        {errors.email}
+                                        {errors.identifier}
                                     </p>
                                 )}
                             </div>
@@ -174,8 +177,8 @@ export default function Login({ status, canResetPassword }) {
                                 )}
                             </div>
 
-                            {/* Remember me + Lupa password */}
-                            <div className="flex items-center justify-between">
+                            {/* Remember me */}
+                            <div className="flex items-center">
                                 <label className="flex items-center gap-2 cursor-pointer select-none">
                                     <input
                                         type="checkbox"
@@ -186,15 +189,6 @@ export default function Login({ status, canResetPassword }) {
                                     />
                                     <span className="text-sm text-gray-600">Ingat saya</span>
                                 </label>
-
-                                {canResetPassword && (
-                                    <Link
-                                        href={route('password.request')}
-                                        className="text-sm text-blue-600 hover:text-blue-700 hover:underline transition-colors"
-                                    >
-                                        Lupa password?
-                                    </Link>
-                                )}
                             </div>
 
                             {/* Tombol Login */}
@@ -221,8 +215,17 @@ export default function Login({ status, canResetPassword }) {
                             </button>
                         </form>
 
+                        {/* Info hint */}
+                        <div className="mt-6 p-4 bg-blue-50 border border-blue-100 rounded-xl">
+                            <p className="text-xs text-blue-700 font-medium mb-1">Panduan Login</p>
+                            <ul className="text-xs text-blue-600 space-y-0.5">
+                                <li>• <span className="font-medium">Admin</span>: gunakan alamat email</li>
+                                <li>• <span className="font-medium">Siswa</span>: gunakan NISN (10 digit)</li>
+                            </ul>
+                        </div>
+
                         {/* Footer */}
-                        <p className="mt-8 text-center text-xs text-gray-400">
+                        <p className="mt-6 text-center text-xs text-gray-400">
                             &copy; {new Date().getFullYear()} SASS · Sistem Absensi Siswa Digital
                         </p>
                     </div>
