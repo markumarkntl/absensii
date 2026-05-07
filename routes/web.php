@@ -41,7 +41,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::patch('/izin/{id}', [Admin\PermissionController::class, 'approve'])->name('izin.approve');
 
         // Laporan
-        Route::get('/laporan',     [Admin\ReportController::class,     'index'])  ->name('laporan');
+        Route::get('/laporan',        [Admin\ReportController::class, 'index'])  ->name('laporan');
+        Route::get('/laporan/export', [Admin\ReportController::class, 'export']) ->name('laporan.export');
     });
 
     // ── Redirect /dashboard berdasarkan role ──────────────────────────────────
