@@ -170,6 +170,26 @@ class AttendanceService
     }
 
     // -------------------------------------------------------------------------
+    // STATISTIK TAHUNAN (untuk laporan siswa)
+    // -------------------------------------------------------------------------
+
+    /**
+     * Statistik kehadiran siswa dalam satu tahun penuh.
+     */
+    public function getYearlyStats(StudentDetail $student, int $year): array
+    {
+        $attendances = $student->attendances()
+            ->whereYear('date', $year)
+            ->get();
+
+        return [
+            'hadir' => $attendances->where('status', 'Hadir')->count(),
+            'sakit' => $attendances->where('status', 'Sakit')->count(),
+            'izin'  => $attendances->where('status', 'Izin')->count(),
+            'alfa'  => $attendances->where('status', 'Alfa')->count(),
+        ];
+    }
+    // -------------------------------------------------------------------------
     // STATISTIK & RIWAYAT
     // -------------------------------------------------------------------------
 
