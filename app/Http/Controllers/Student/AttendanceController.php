@@ -59,9 +59,7 @@ class AttendanceController extends Controller
     public function store(Request $request): RedirectResponse
     {
         $request->validate([
-            'lat'   => ['required', 'numeric', 'between:-90,90'],
-            'lng'   => ['required', 'numeric', 'between:-180,180'],
-            'photo' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
+            'photo' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
         ]);
 
         /** @var \App\Models\User $user */
@@ -70,8 +68,8 @@ class AttendanceController extends Controller
 
         $result = $this->attendanceService->checkIn(
             student: $student,
-            lat:     (float) $request->lat,
-            lng:     (float) $request->lng,
+            lat:     null,
+            lng:     null,
             photo:   $request->file('photo'),
         );
 

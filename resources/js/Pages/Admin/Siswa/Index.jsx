@@ -76,6 +76,7 @@ function StudentModal({ mode, student, classrooms, onClose }) {
         const options = {
             forceFormData: true,
             onSuccess: () => { reset(); onClose(); },
+            onError: () => {}, // jangan tutup modal jika ada error validasi
         };
         if (isEdit) {
             post(route('admin.siswa.update', student.id) + '?_method=PUT', options);
@@ -295,7 +296,7 @@ function DeleteModal({ student, onClose }) {
 
 // ── Pagination ────────────────────────────────────────────────────────────────
 function Pagination({ links, meta }) {
-    if (meta.last_page <= 1) return null;
+    if (!meta || !links || meta.last_page <= 1) return null;
 
     return (
         <div className="flex items-center justify-between px-4 py-3 border-t border-slate-200">
@@ -354,6 +355,12 @@ export default function SiswaIndex({ students, classrooms, filters }) {
     const [modal, setModal]   = useState(null); // null | 'add' | 'edit' | 'delete'
     const [selected, setSelected] = useState(null);
 
+    // Guard against undefined data
+    const studentsData  = students?.data  ?? [];
+    const studentsTotal = students?.total ?? 0;
+    const studentsMeta  = students?.meta  ?? null;
+    const studentsLinks = students?.links ?? [];
+
     const { data: searchData, setData: setSearch, get } = useForm({
         search:       filters.search       ?? '',
         classroom_id: filters.classroom_id ?? '',
@@ -377,7 +384,7 @@ export default function SiswaIndex({ students, classrooms, filters }) {
                 <div>
                     <h2 className="text-lg font-bold text-slate-800">Manajemen Siswa</h2>
                     <p className="text-sm text-slate-500 mt-0.5">
-                        Total <span className="font-semibold text-slate-700">{students.total}</span> siswa terdaftar
+                        Total <span className="font-semibold text-slate-700">{studentsTotal}</span> siswa terdaftar
                     </p>
                 </div>
                 <button
@@ -427,7 +434,7 @@ export default function SiswaIndex({ students, classrooms, filters }) {
 
             {/* ── Tabel ── */}
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-                {students.data.length === 0 ? (
+                {studentsData.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-16 text-slate-400">
                         <User size={40} className="mb-3 opacity-30" />
                         <p className="text-sm font-medium">Tidak ada siswa ditemukan</p>
@@ -456,7 +463,7 @@ export default function SiswaIndex({ students, classrooms, filters }) {
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100">
-                                    {students.data.map(s => (
+                                    {studentsData.map(s => (
                                         <tr key={s.id} className="hover:bg-slate-50/70 transition-colors">
                                             <td className="px-5 py-4">
                                                 <div className="flex items-center gap-3">
@@ -519,7 +526,7 @@ export default function SiswaIndex({ students, classrooms, filters }) {
 
                         {/* Mobile Cards */}
                         <div className="md:hidden divide-y divide-slate-100">
-                            {students.data.map(s => (
+                            {studentsData.map(s => (
                                 <div key={s.id} className="flex items-center gap-3 px-4 py-4">
                                     {s.foto_profil ? (
                                         <img
@@ -557,7 +564,7 @@ export default function SiswaIndex({ students, classrooms, filters }) {
                             ))}
                         </div>
 
-                        <Pagination links={students.links} meta={students.meta} />
+                        <Pagination links={studentsLinks} meta={studentsMeta} />
                     </>
                 )}
             </div>

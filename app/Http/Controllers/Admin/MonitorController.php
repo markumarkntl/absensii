@@ -41,7 +41,7 @@ class MonitorController extends Controller
         $totalIzin  = (int) ($stats['Izin']  ?? 0);
         $totalAlfa  = (int) ($stats['Alfa']  ?? 0);
         $sudahAbsen = Attendance::whereDate('date', $today)->count();
-        $belumAbsen = $totalSiswa - $sudahAbsen;
+        $belumAbsen = max(0, $totalSiswa - $sudahAbsen);
 
         $summary = [
             'total'       => $totalSiswa,
@@ -53,19 +53,22 @@ class MonitorController extends Controller
             'persenHadir' => $totalSiswa > 0 ? round(($totalHadir / $totalSiswa) * 100) : 0,
         ];
 
+        // ── Ambil semua absensi hari ini sekaligus, index by student_id ─────────
+        // Lebih reliable daripada nested eager loading dengan constraint
+        $todayAttendances = Attendance::whereDate('date', $today)
+            ->get()
+            ->keyBy('student_id');
+
         // ── Data per kelas ────────────────────────────────────────────────────
-        $classesQuery = Classroom::with([
-            'students.user',
-            'students.attendances' => fn ($q) => $q->whereDate('date', $today),
-        ]);
+        $classesQuery = Classroom::with(['students.user']);
 
         if ($classId) {
             $classesQuery->where('id', $classId);
         }
 
-        $classes = $classesQuery->get()->map(function (Classroom $classroom) use ($statusFilter) {
-            $students = $classroom->students->map(function (StudentDetail $student) {
-                $att = $student->attendances->first();
+        $classes = $classesQuery->get()->map(function (Classroom $classroom) use ($todayAttendances, $statusFilter) {
+            $students = $classroom->students->map(function (StudentDetail $student) use ($todayAttendances) {
+                $att = $todayAttendances->get($student->id);
 
                 return [
                     'id'       => $student->id,
@@ -78,13 +81,13 @@ class MonitorController extends Controller
                 ];
             });
 
-            // Filter status setelah mapping (agar persen tetap akurat)
+            $total = $students->count();
+            $hadir = $students->where('status', 'Hadir')->count();
+
+            // Filter status untuk tampilan (hitung statistik dulu, baru filter)
             $filtered = $statusFilter
                 ? $students->filter(fn ($s) => $s['status'] === $statusFilter)->values()
-                : $students;
-
-            $total = $classroom->students->count();
-            $hadir = $students->where('status', 'Hadir')->count();
+                : $students->values();
 
             return [
                 'id'       => $classroom->id,

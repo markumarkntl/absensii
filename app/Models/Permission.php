@@ -7,6 +7,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Permission extends Model
 {
+    protected $table = 'permission_requests';
+
     protected $fillable = [
         'student_id', 'start_date', 'end_date',
         'type', 'reason', 'proof_file',

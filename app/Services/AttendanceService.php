@@ -113,8 +113,8 @@ class AttendanceService
      */
     public function checkIn(
         StudentDetail $student,
-        float         $lat,
-        float         $lng,
+        ?float        $lat,
+        ?float        $lng,
         ?UploadedFile $photo = null
     ): array {
         // 1. Cek deadline jam absen
@@ -134,15 +134,17 @@ class AttendanceService
             ];
         }
 
-        // 3. Validasi radius geofencing
-        if (! $this->isWithinRadius($lat, $lng)) {
-            $distance = round($this->getDistanceFromSchool($lat, $lng));
-            $radius   = config('sass.attendance_radius_meters');
+        // 3. Validasi radius geofencing (hanya jika koordinat tersedia)
+        if ($lat !== null && $lng !== null) {
+            if (! $this->isWithinRadius($lat, $lng)) {
+                $distance = round($this->getDistanceFromSchool($lat, $lng));
+                $radius   = config('sass.attendance_radius_meters');
 
-            return [
-                'success' => false,
-                'message' => "Lokasi kamu terlalu jauh dari sekolah ({$distance} meter). Maksimal radius absen adalah {$radius} meter.",
-            ];
+                return [
+                    'success' => false,
+                    'message' => "Lokasi kamu terlalu jauh dari sekolah ({$distance} meter). Maksimal radius absen adalah {$radius} meter.",
+                ];
+            }
         }
 
         // 4. Simpan foto selfie

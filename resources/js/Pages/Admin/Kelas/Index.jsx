@@ -208,7 +208,7 @@ function DeleteModal({ kelas, onClose }) {
 
 // ── Pagination ────────────────────────────────────────────────────────────────
 function Pagination({ links, meta }) {
-    if (meta.last_page <= 1) return null;
+    if (!meta || !links || meta.last_page <= 1) return null;
     return (
         <div className="flex items-center justify-between px-4 py-3 border-t border-slate-200">
             <p className="text-xs text-slate-500">
@@ -247,6 +247,11 @@ export default function KelasIndex({ classrooms, academicYears, filters }) {
     const [modal, setModal]     = useState(null);
     const [selected, setSelected] = useState(null);
 
+    const classroomsData  = classrooms?.data  ?? [];
+    const classroomsTotal = classrooms?.total ?? 0;
+    const classroomsMeta  = classrooms?.meta  ?? null;
+    const classroomsLinks = classrooms?.links ?? [];
+
     const { data: searchData, setData: setSearch, get } = useForm({
         search:           filters.search           ?? '',
         academic_year_id: filters.academic_year_id ?? '',
@@ -270,7 +275,7 @@ export default function KelasIndex({ classrooms, academicYears, filters }) {
                 <div>
                     <h2 className="text-lg font-bold text-slate-800">Manajemen Kelas</h2>
                     <p className="text-sm text-slate-500 mt-0.5">
-                        Total <span className="font-semibold text-slate-700">{classrooms.total}</span> kelas terdaftar
+                        Total <span className="font-semibold text-slate-700">{classroomsTotal}</span> kelas terdaftar
                     </p>
                 </div>
                 <button
@@ -319,7 +324,7 @@ export default function KelasIndex({ classrooms, academicYears, filters }) {
             </form>
 
             {/* ── Grid Kelas / Tabel ── */}
-            {classrooms.data.length === 0 ? (
+            {classroomsData.length === 0 ? (
                 <div className="bg-white rounded-2xl border border-slate-200 shadow-sm">
                     <div className="flex flex-col items-center justify-center py-16 text-slate-400">
                         <BookOpen size={40} className="mb-3 opacity-30" />
@@ -350,7 +355,7 @@ export default function KelasIndex({ classrooms, academicYears, filters }) {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100">
-                                {classrooms.data.map(k => (
+                                {classroomsData.map(k => (
                                     <tr key={k.id} className="hover:bg-slate-50/70 transition-colors">
                                         <td className="px-5 py-4">
                                             <div className="flex items-center gap-3">
@@ -405,7 +410,7 @@ export default function KelasIndex({ classrooms, academicYears, filters }) {
 
                     {/* Mobile Cards */}
                     <div className="md:hidden divide-y divide-slate-100">
-                        {classrooms.data.map(k => (
+                        {classroomsData.map(k => (
                             <div key={k.id} className="flex items-center gap-3 px-4 py-4">
                                 <div className="w-10 h-10 rounded-xl bg-indigo-100 flex items-center
                                                 justify-center text-indigo-600 flex-shrink-0">
@@ -434,7 +439,7 @@ export default function KelasIndex({ classrooms, academicYears, filters }) {
                         ))}
                     </div>
 
-                    <Pagination links={classrooms.links} meta={classrooms.meta} />
+                    <Pagination links={classroomsLinks} meta={classroomsMeta} />
                 </div>
             )}
 

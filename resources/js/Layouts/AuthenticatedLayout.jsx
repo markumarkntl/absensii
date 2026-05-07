@@ -209,11 +209,12 @@ function Topbar({ setMobileOpen, title }) {
 export default function AuthenticatedLayout({ children, title = 'Dashboard' }) {
     const [collapsed,   setCollapsed]   = useState(false);
     const [mobileOpen, setMobileOpen] = useState(false);
+    const { url } = usePage();
 
     // Tutup mobile sidebar saat navigasi
     useEffect(() => {
         setMobileOpen(false);
-    }, [window.location.pathname]);
+    }, [url]);
 
     return (
         <div className="flex h-screen bg-slate-50 overflow-hidden">
