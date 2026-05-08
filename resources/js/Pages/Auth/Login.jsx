@@ -16,7 +16,7 @@ export default function Login({ status }) {
 
     return (
         <>
-            <Head title="Login — SASS" />
+            <Head title="Login" />
 
             <div className="min-h-screen flex">
 
@@ -48,9 +48,9 @@ export default function Login({ status }) {
                                         d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                                 </svg>
                             </div>
-                            <span className="text-white font-bold text-xl tracking-wide">SASS</span>
+                            <span className="text-white font-bold text-xl tracking-wide">Absenku</span>
                         </div>
-                        <p className="text-blue-200 text-sm">Sistem Absensi Siswa Digital</p>
+                        <p className="text-blue-200 text-sm">Smk Al Azhar Menganti</p>
                     </div>
 
                     {/* Teks tengah */}
@@ -59,14 +59,14 @@ export default function Login({ status }) {
                             Hadir Tepat<br />Waktu, Setiap Hari.
                         </h1>
                         <p className="text-blue-200 text-base leading-relaxed max-w-sm">
-                            Presensi digital berbasis GPS yang akurat, mudah, dan tercatat otomatis setiap hari sekolah.
+                            Presensi digital tercatat otomatis setiap hari Penting Absen.
                         </p>
                     </div>
 
                     {/* Stats bawah */}
                     <div className="relative z-10 flex gap-8">
                         <div>
-                            <p className="text-white text-2xl font-bold">GPS</p>
+                            <p className="text-white text-2xl font-bold">Fotomu</p>
                             <p className="text-blue-200 text-xs mt-0.5">Geofencing Akurat</p>
                         </div>
                         <div className="w-px bg-white/20" />
@@ -76,7 +76,7 @@ export default function Login({ status }) {
                         </div>
                         <div className="w-px bg-white/20" />
                         <div>
-                            <p className="text-white text-2xl font-bold">Real‑time</p>
+                            <p className="text-white text-2xl font-bold">Real-time</p>
                             <p className="text-blue-200 text-xs mt-0.5">Monitor Admin</p>
                         </div>
                     </div>
@@ -93,7 +93,7 @@ export default function Login({ status }) {
                                     d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                             </svg>
                         </div>
-                        <span className="font-bold text-gray-900 text-lg">SASS</span>
+                        <span className="font-bold text-gray-900 text-lg">Absenku</span>
                     </div>
 
                     <div className="w-full max-w-md">
@@ -226,7 +226,7 @@ export default function Login({ status }) {
 
                         {/* Footer */}
                         <p className="mt-6 text-center text-xs text-gray-400">
-                            &copy; {new Date().getFullYear()} SASS · Sistem Absensi Siswa Digital
+                            &copy; {new Date().getFullYear()} SASS · Smk Al Azhar Menganti
                         </p>
                     </div>
                 </div>

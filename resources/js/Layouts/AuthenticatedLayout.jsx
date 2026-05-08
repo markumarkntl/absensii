@@ -75,8 +75,8 @@ function Sidebar({ collapsed, setCollapsed, mobileOpen, setMobileOpen }) {
                 </div>
                 {!collapsed && (
                     <div>
-                        <p className="font-bold text-sm leading-tight">SASS</p>
-                        <p className="text-[10px] text-slate-400 leading-tight">Sistem Absensi Siswa</p>
+                        <p className="font-bold text-sm leading-tight">Absenku</p>
+                        <p className="text-[10px] text-slate-400 leading-tight">Smk Al Azhar Menganti</p>
                     </div>
                 )}
             </div>

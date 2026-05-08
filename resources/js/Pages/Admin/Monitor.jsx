@@ -340,7 +340,7 @@ export default function Monitor({
                             className="px-3 py-2 text-sm rounded-xl border border-slate-200 bg-white
                                        outline-none focus:ring-2 focus:ring-blue-500 text-slate-700"
                         >
-                            <option value="">Semua Status</option>
+                            <option value="">All Status</option>
                             {Object.entries(STATUS_CFG).map(([key, { label }]) => (
                                 <option key={key} value={key}>{label}</option>
                             ))}

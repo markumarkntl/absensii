@@ -6,7 +6,7 @@ export default function Dashboard() {
         <AuthenticatedLayout title="Dashboard Admin">
             <FlashMessage />
             <div className="bg-white rounded-xl border border-slate-200 p-6">
-                <p className="text-slate-500 text-sm">Panel Admin — fitur lengkap hadir di langkah berikutnya.</p>
+                <p className="text-slate-500 text-sm">INI ADALAH HALAMAN ADMIN SEMENTARA.</p>
             </div>
         </AuthenticatedLayout>
     );
