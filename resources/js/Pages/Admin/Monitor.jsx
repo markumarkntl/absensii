@@ -1,11 +1,14 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { router } from '@inertiajs/react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import FlashMessage from '@/Components/FlashMessage';
+import useEcho from '@/Hooks/useEcho';
+import useToast from '@/Hooks/useToast';
+import RealtimeToast from '@/Components/RealtimeToast';
 import {
     Users, CheckCircle2, HeartPulse, FileText,
     Clock, AlertTriangle, RefreshCw, ChevronDown,
-    ChevronUp, Search, Filter, Activity,
+    ChevronUp, Activity,
 } from 'lucide-react';
 
 // ── Status config ──────────────────────────────────────────────────────────────
@@ -27,7 +30,6 @@ function StatusBadge({ status }) {
     );
 }
 
-// ── Kartu ringkasan ────────────────────────────────────────────────────────────
 function SummaryCard({ icon: Icon, label, value, color, sub }) {
     return (
         <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm flex items-center gap-4">
@@ -43,7 +45,6 @@ function SummaryCard({ icon: Icon, label, value, color, sub }) {
     );
 }
 
-// ── Progress bar ───────────────────────────────────────────────────────────────
 function ProgressBar({ value, color = 'bg-green-500' }) {
     return (
         <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
@@ -55,7 +56,6 @@ function ProgressBar({ value, color = 'bg-green-500' }) {
     );
 }
 
-// ── Accordion per kelas ────────────────────────────────────────────────────────
 function ClassAccordion({ kelas, searchQuery }) {
     const [open, setOpen] = useState(false);
 
@@ -81,7 +81,6 @@ function ClassAccordion({ kelas, searchQuery }) {
                 <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center flex-shrink-0">
                     <Users size={18} className="text-blue-600" />
                 </div>
-
                 <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
                         <p className="font-bold text-slate-800 text-sm">{kelas.name}</p>
@@ -98,7 +97,6 @@ function ClassAccordion({ kelas, searchQuery }) {
                         <span className="font-bold text-slate-700">{kelas.persen}%</span>
                     </div>
                 </div>
-
                 <div className="hidden sm:flex items-center gap-2 flex-shrink-0">
                     {['Sakit', 'Izin', 'Alfa', 'Belum'].map(s => {
                         const count = countByStatus(s);
@@ -111,7 +109,6 @@ function ClassAccordion({ kelas, searchQuery }) {
                         );
                     })}
                 </div>
-
                 {open
                     ? <ChevronUp size={16} className="text-slate-400 flex-shrink-0" />
                     : <ChevronDown size={16} className="text-slate-400 flex-shrink-0" />}
@@ -150,14 +147,10 @@ function ClassAccordion({ kelas, searchQuery }) {
                                             )}
                                         </div>
                                         {siswa.time_in && (
-                                            <p className="text-xs text-slate-400">
-                                                Masuk: {siswa.time_in}
-                                            </p>
+                                            <p className="text-xs text-slate-400">Masuk: {siswa.time_in}</p>
                                         )}
                                         {siswa.time_out && (
-                                            <p className="text-xs text-slate-400">
-                                                Pulang: {siswa.time_out}
-                                            </p>
+                                            <p className="text-xs text-slate-400">Pulang: {siswa.time_out}</p>
                                         )}
                                     </div>
                                 </div>
@@ -170,7 +163,7 @@ function ClassAccordion({ kelas, searchQuery }) {
     );
 }
 
-// ── Live feed ──────────────────────────────────────────────────────────────────
+// ── Live Feed ──────────────────────────────────────────────────────────────────
 function LiveFeed({ checkins }) {
     return (
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
@@ -182,7 +175,6 @@ function LiveFeed({ checkins }) {
                     Live
                 </span>
             </div>
-
             {checkins.length === 0 ? (
                 <p className="text-center py-8 text-sm text-slate-400">Belum ada check-in hari ini.</p>
             ) : (
@@ -197,7 +189,15 @@ function LiveFeed({ checkins }) {
                                 <p className="text-xs font-semibold text-slate-700 truncate">{c.name}</p>
                                 <p className="text-xs text-slate-400">{c.classroom}</p>
                             </div>
-                            <p className="text-xs font-mono text-slate-500 flex-shrink-0">{c.time_in}</p>
+                            <div className="text-right flex-shrink-0">
+                                <p className="text-xs font-mono text-slate-500">{c.time_in}</p>
+                                {c.is_late && (
+                                    <span className="text-xs text-amber-600 font-semibold">Terlambat</span>
+                                )}
+                                {c.time_out && (
+                                    <p className="text-xs text-blue-500 font-mono">Pulang: {c.time_out}</p>
+                                )}
+                            </div>
                         </div>
                     ))}
                 </div>
@@ -208,15 +208,77 @@ function LiveFeed({ checkins }) {
 
 // ── Main Page ──────────────────────────────────────────────────────────────────
 export default function Monitor({
-    summary, byClass, recentCheckins,
-    classOptions, filterClass, filterStatus, today,
+    summary: initialSummary,
+    byClass,
+    recentCheckins: initialCheckins,
+    classOptions,
+    filterClass,
+    filterStatus,
+    today,
 }) {
-    const [search, setSearch]           = useState('');
-    const [localClass, setLocalClass]   = useState(filterClass ?? '');
+    const [search, setSearch]         = useState('');
+    const [localClass, setLocalClass] = useState(filterClass ?? '');
     const [localStatus, setLocalStatus] = useState(filterStatus ?? '');
-    const [refreshing, setRefreshing]   = useState(false);
+    const [refreshing, setRefreshing] = useState(false);
 
-    // Auto-refresh setiap 60 detik
+    // 🔴 State real-time
+    const [summary, setSummary]         = useState(initialSummary);
+    const [checkins, setCheckins]       = useState(initialCheckins);
+    const { toasts, addToast, removeToast } = useToast();
+
+    // 🔴 Listen event check-in
+    useEcho('admin.attendance', 'attendance.checked-in', useCallback((payload) => {
+        const d = payload.data;
+
+        // Tambah ke live feed (paling atas, max 15)
+        setCheckins(prev => {
+            const exists = prev.find(c => c.id === d.id);
+            if (exists) return prev;
+            return [
+                {
+                    id: d.id, name: d.student_name,
+                    classroom: d.classroom, time_in: d.time_in,
+                    is_late: d.is_late, time_out: null,
+                },
+                ...prev,
+            ].slice(0, 15);
+        });
+
+        // Update summary counter
+        setSummary(prev => ({
+            ...prev,
+            hadir: prev.hadir + 1,
+            belum: Math.max(0, prev.belum - 1),
+            persenHadir: prev.total > 0
+                ? Math.round(((prev.hadir + 1) / prev.total) * 100)
+                : 0,
+        }));
+
+        // Toast notifikasi
+        addToast({
+            type: d.is_late ? 'terlambat' : 'check-in',
+            title: d.is_late ? '⚠️ Siswa Terlambat' : '✅ Siswa Check-in',
+            message: `${d.student_name} — ${d.classroom}`,
+        });
+    }, [addToast]));
+
+    // 🔴 Listen event check-out
+    useEcho('admin.attendance', 'attendance.checked-out', useCallback((payload) => {
+        const d = payload.data;
+
+        // Update time_out di live feed
+        setCheckins(prev =>
+            prev.map(c => c.id === d.id ? { ...c, time_out: d.time_out } : c)
+        );
+
+        addToast({
+            type: 'check-out',
+            title: '🏠 Siswa Check-out',
+            message: `${d.student_name} — ${d.classroom} pukul ${d.time_out}`,
+        });
+    }, [addToast]));
+
+    // Auto-refresh setiap 60 detik (fallback)
     useEffect(() => {
         const id = setInterval(() => {
             router.reload({ only: ['summary', 'byClass', 'recentCheckins'] });
@@ -259,23 +321,31 @@ export default function Monitor({
         <AuthenticatedLayout title="Monitor Real-time">
             <FlashMessage />
 
-            <div className="space-y-5">
+            {/*  Toast real-time pojok kanan bawah */}
+            <RealtimeToast toasts={toasts} onRemove={removeToast} />
 
+            <div className="space-y-5">
                 {/* Header */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div>
                         <h2 className="text-xl font-bold text-slate-800">Monitor Absensi</h2>
                         <p className="text-sm text-slate-500 mt-0.5 capitalize">{today}</p>
                     </div>
-                    <button
-                        onClick={handleRefresh}
-                        className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold
-                                   bg-white border border-slate-200 text-slate-600 hover:bg-slate-50
-                                   transition-colors shadow-sm self-start sm:self-auto"
-                    >
-                        <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />
-                        Refresh
-                    </button>
+                    <div className="flex items-center gap-2">
+                        <span className="flex items-center gap-1.5 text-xs text-green-600 font-medium">
+                            <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                            Real-time aktif
+                        </span>
+                        <button
+                            onClick={handleRefresh}
+                            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold
+                                       bg-white border border-slate-200 text-slate-600 hover:bg-slate-50
+                                       transition-colors shadow-sm"
+                        >
+                            <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />
+                            Refresh
+                        </button>
+                    </div>
                 </div>
 
                 {/* Summary cards */}
@@ -283,7 +353,7 @@ export default function Monitor({
                     {summaryCards.map(c => <SummaryCard key={c.label} {...c} />)}
                 </div>
 
-                {/* Progress bar gabungan */}
+                {/* Progress bar */}
                 <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
                     <div className="flex items-center justify-between mb-2">
                         <p className="text-sm font-semibold text-slate-700">Komposisi Kehadiran Hari Ini</p>
@@ -308,11 +378,11 @@ export default function Monitor({
                     </div>
                     <div className="flex flex-wrap gap-4 mt-2.5">
                         {[
-                            { label: 'Hadir',      val: summary.hadir, dot: 'bg-green-500'  },
-                            { label: 'Sakit',      val: summary.sakit, dot: 'bg-blue-400'   },
-                            { label: 'Izin',       val: summary.izin,  dot: 'bg-purple-400' },
-                            { label: 'Alfa',       val: summary.alfa,  dot: 'bg-red-400'    },
-                            { label: 'Belum Absen',val: summary.belum, dot: 'bg-slate-300'  },
+                            { label: 'Hadir',       val: summary.hadir, dot: 'bg-green-500'  },
+                            { label: 'Sakit',       val: summary.sakit, dot: 'bg-blue-400'   },
+                            { label: 'Izin',        val: summary.izin,  dot: 'bg-purple-400' },
+                            { label: 'Alfa',        val: summary.alfa,  dot: 'bg-red-400'    },
+                            { label: 'Belum Absen', val: summary.belum, dot: 'bg-slate-300'  },
                         ].map(({ label, val, dot }) => (
                             <div key={label} className="flex items-center gap-1.5 text-xs text-slate-500">
                                 <span className={`w-2 h-2 rounded-full ${dot}`} />
@@ -322,98 +392,73 @@ export default function Monitor({
                     </div>
                 </div>
 
-                {/* Filter & Search */}
-                <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
-                    <div className="flex flex-col sm:flex-row gap-3">
-                        <div className="relative flex-1">
-                            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                            <input
-                                type="text"
-                                placeholder="Cari nama / NISN siswa..."
-                                value={search}
-                                onChange={e => setSearch(e.target.value)}
-                                className="w-full pl-9 pr-3 py-2 text-sm rounded-xl border border-slate-200
-                                           bg-slate-50 outline-none focus:ring-2 focus:ring-blue-500
-                                           focus:border-blue-500 transition-colors"
-                            />
-                        </div>
-
+                {/* Filter */}
+                <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm flex flex-wrap gap-3 items-end">
+                    <div className="flex-1 min-w-40">
+                        <label className="text-xs font-semibold text-slate-600 mb-1 block">Kelas</label>
                         <select
                             value={localClass}
                             onChange={e => setLocalClass(e.target.value)}
-                            className="px-3 py-2 text-sm rounded-xl border border-slate-200 bg-white
-                                       outline-none focus:ring-2 focus:ring-blue-500 text-slate-700"
+                            className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                         >
                             <option value="">Semua Kelas</option>
                             {classOptions.map(k => (
                                 <option key={k.id} value={k.id}>{k.nama_kelas}</option>
                             ))}
                         </select>
-
+                    </div>
+                    <div className="flex-1 min-w-40">
+                        <label className="text-xs font-semibold text-slate-600 mb-1 block">Status</label>
                         <select
                             value={localStatus}
                             onChange={e => setLocalStatus(e.target.value)}
-                            className="px-3 py-2 text-sm rounded-xl border border-slate-200 bg-white
-                                       outline-none focus:ring-2 focus:ring-blue-500 text-slate-700"
+                            className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                         >
-                            <option value="">All Status</option>
-                            {Object.entries(STATUS_CFG).map(([key, { label }]) => (
-                                <option key={key} value={key}>{label}</option>
+                            <option value="">Semua Status</option>
+                            {['Hadir','Sakit','Izin','Alfa','Belum'].map(s => (
+                                <option key={s} value={s}>{s}</option>
                             ))}
                         </select>
-
-                        <div className="flex gap-2">
-                            <button
-                                onClick={applyFilter}
-                                className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold
-                                           bg-blue-600 text-white hover:bg-blue-700 transition-colors"
-                            >
-                                <Filter size={13} /> Terapkan
-                            </button>
-                            {(filterClass || filterStatus) && (
-                                <button
-                                    onClick={resetFilter}
-                                    className="px-3 py-2 rounded-xl text-sm text-slate-500 border border-slate-200
-                                               hover:bg-slate-50 transition-colors"
-                                >
-                                    Reset
-                                </button>
-                            )}
-                        </div>
+                    </div>
+                    <button onClick={applyFilter}
+                        className="px-4 py-2 rounded-lg text-sm font-semibold bg-blue-600 text-white hover:bg-blue-700 transition-colors">
+                        Filter
+                    </button>
+                    <button onClick={resetFilter}
+                        className="px-4 py-2 rounded-lg text-sm font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors">
+                        Reset
+                    </button>
+                    <div className="flex-1 min-w-48">
+                        <label className="text-xs font-semibold text-slate-600 mb-1 block">Cari Siswa</label>
+                        <input
+                            type="text"
+                            placeholder="Nama / NISN..."
+                            value={search}
+                            onChange={e => setSearch(e.target.value)}
+                            className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
                     </div>
                 </div>
 
-                {/* Accordion kelas + live feed */}
+                {/* Content grid */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-
-                    {/* Kelas — 2/3 lebar */}
+                    {/* Daftar kelas */}
                     <div className="lg:col-span-2 space-y-3">
-                        <h3 className="text-sm font-bold text-slate-700 flex items-center gap-2">
-                            <Users size={15} className="text-blue-500" />
-                            Status Per Kelas
-                            <span className="text-slate-400 font-normal">({byClass.length} kelas)</span>
-                        </h3>
-
                         {byClass.length === 0 ? (
-                            <div className="bg-white rounded-2xl border border-slate-200 p-10 text-center shadow-sm">
-                                <Users size={32} className="mx-auto mb-2 text-slate-300" />
-                                <p className="text-sm text-slate-400">Tidak ada data kelas.</p>
+                            <div className="bg-white rounded-2xl border border-slate-200 p-8 text-center">
+                                <p className="text-slate-400 text-sm">Tidak ada data kelas.</p>
                             </div>
-                        ) : byClass.map(kelas => (
-                            <ClassAccordion key={kelas.id} kelas={kelas} searchQuery={search} />
-                        ))}
+                        ) : (
+                            byClass.map(k => (
+                                <ClassAccordion key={k.id} kelas={k} searchQuery={search} />
+                            ))
+                        )}
                     </div>
 
-                    {/* Live feed — 1/3 lebar */}
-                    <div className="space-y-3">
-                        <h3 className="text-sm font-bold text-slate-700 flex items-center gap-2">
-                            <Activity size={15} className="text-green-500" />
-                            Check-in Real-time
-                        </h3>
-                        <LiveFeed checkins={recentCheckins} />
-                        <p className="text-xs text-slate-400 text-center">Auto-refresh setiap 60 detik</p>
+                    {/* Live feed */}
+                    <div className="lg:col-span-1">
+                        <LiveFeed checkins={checkins} />
                     </div>
-
                 </div>
             </div>
         </AuthenticatedLayout>

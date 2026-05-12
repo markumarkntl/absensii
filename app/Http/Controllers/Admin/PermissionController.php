@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Events\PermissionUpdated;
 use App\Http\Controllers\Controller;
 use App\Models\Attendance;
 use App\Models\Permission;
@@ -12,17 +13,10 @@ use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
+use App\Events\PermissionStatusChanged;
 
 class PermissionController extends Controller
 {
-    // -------------------------------------------------------------------------
-    // Daftar Pengajuan Izin (Admin)
-    // -------------------------------------------------------------------------
-
-    /**
-     * GET /admin/izin?status=Pending
-     * Tampilkan semua pengajuan izin siswa dengan filter status.
-     */
     public function index(Request $request): Response
     {
         $status = $request->query('status', 'Pending');
@@ -37,7 +31,6 @@ class PermissionController extends Controller
             ->paginate(15)
             ->withQueryString();
 
-        // Badge count untuk setiap tab status
         $counts = [
             'pending'  => Permission::where('is_approved', 'Pending')->count(),
             'approved' => Permission::where('is_approved', 'Approved')->count(),
@@ -51,15 +44,6 @@ class PermissionController extends Controller
         ]);
     }
 
-    // -------------------------------------------------------------------------
-    // Approve / Reject Izin
-    // -------------------------------------------------------------------------
-
-    /**
-     * PATCH /admin/izin/{id}
-     * Setujui atau tolak pengajuan izin siswa.
-     * Jika disetujui, update status attendance pada rentang tanggal izin.
-     */
     public function approve(Request $request, int $id): RedirectResponse
     {
         $request->validate([
@@ -69,7 +53,6 @@ class PermissionController extends Controller
 
         $permission = Permission::with('student')->findOrFail($id);
 
-        // Pastikan izin masih berstatus Pending
         if ($permission->is_approved !== 'Pending') {
             return back()->with('error', 'Pengajuan ini sudah diproses sebelumnya.');
         }
@@ -80,29 +63,23 @@ class PermissionController extends Controller
             'approved_at' => now(),
         ]);
 
-        // Jika disetujui: sinkronisasi status attendance
         if ($request->action === 'Approved') {
             $this->syncAttendanceStatus($permission);
         }
+
+        //  Broadcast ke channel admin.permission
+        broadcast(new PermissionUpdated(
+            $permission->fresh(),
+            strtolower($request->action) // 'approved' | 'rejected'
+        ));
+        // 🔴 Broadcast ke siswa yang bersangkutan
+        broadcast(new PermissionStatusChanged($permission->fresh()));
 
         $label = $request->action === 'Approved' ? 'disetujui' : 'ditolak';
 
         return back()->with('success', "Pengajuan izin berhasil {$label}.");
     }
 
-    // -------------------------------------------------------------------------
-    // Helper: Sinkronisasi Attendance
-    // -------------------------------------------------------------------------
-
-    /**
-     * Setelah izin disetujui, update atau buat record attendance pada
-     * rentang tanggal izin (skip Sabtu & Minggu).
-     *
-     * Aturan:
-     * - Jika record sudah ada dan statusnya Alfa → update ke Sakit/Izin
-     * - Jika record sudah ada dan statusnya Hadir → biarkan (tidak di-override)
-     * - Jika record belum ada → buat baru dengan status Sakit/Izin
-     */
     private function syncAttendanceStatus(Permission $permission): void
     {
         $period = CarbonPeriod::create(
@@ -111,10 +88,7 @@ class PermissionController extends Controller
         );
 
         foreach ($period as $date) {
-            // Skip hari libur
-            if ($date->isWeekend()) {
-                continue;
-            }
+            if ($date->isWeekend()) continue;
 
             $dateString = $date->toDateString();
             $note       = 'Otomatis dari pengajuan izin #' . $permission->id;
@@ -124,15 +98,10 @@ class PermissionController extends Controller
                 ->first();
 
             if ($existing) {
-                // Hanya update jika saat ini Alfa (tidak menimpa Hadir)
                 if ($existing->status === 'Alfa') {
-                    $existing->update([
-                        'status' => $permission->type,
-                        'note'   => $note,
-                    ]);
+                    $existing->update(['status' => $permission->type, 'note' => $note]);
                 }
             } else {
-                // Belum ada record, buat baru
                 Attendance::create([
                     'student_id' => $permission->student_id,
                     'date'       => $dateString,

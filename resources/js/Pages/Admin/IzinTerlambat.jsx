@@ -1,8 +1,11 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { router } from '@inertiajs/react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import FlashMessage from '@/Components/FlashMessage';
-import { Clock, CheckCircle2, XCircle, AlertTriangle } from 'lucide-react';
+import useEcho from '@/Hooks/useEcho';
+import useToast from '@/Hooks/useToast';
+import RealtimeToast from '@/Components/RealtimeToast';
+import { Clock, CheckCircle2, XCircle, AlertTriangle, Bell } from 'lucide-react';
 
 const STATUS_CFG = {
     Pending:  { label: 'Menunggu',  badge: 'bg-amber-100 text-amber-700 border-amber-200' },
@@ -65,7 +68,7 @@ function RequestCard({ req }) {
                 </div>
             )}
 
-            {/* Tombol approve/reject — hanya jika masih Pending */}
+            {/* Tombol approve/reject */}
             {req.late_permission_status === 'Pending' && (
                 <div className="flex gap-2">
                     <button
@@ -99,17 +102,75 @@ function RequestCard({ req }) {
     );
 }
 
-export default function IzinTerlambat({ requests, pendingCount, statusFilter }) {
-    const [filter, setFilter] = useState(statusFilter ?? 'Pending');
+export default function IzinTerlambat({ requests, pendingCount: initialPendingCount, statusFilter }) {
+    const [filter, setFilter]               = useState(statusFilter ?? 'Pending');
+    const [pendingCount, setPendingCount]   = useState(initialPendingCount);
+    const [newCount, setNewCount]           = useState(0); // 🔴 counter notif baru yg belum dilihat
+    const { toasts, addToast, removeToast } = useToast();
+
+    // 🔴 Listen izin terlambat baru (dari siswa check-in terlambat)
+    useEcho('admin.late-permission', 'late-permission.updated', useCallback((payload) => {
+        const d = payload.data;
+
+        if (d.action === 'new' || d.late_permission_status === 'Pending') {
+            // Tambah pending count
+            setPendingCount(prev => prev + 1);
+
+            // Tambah counter notif baru
+            if (filter !== 'Pending' && filter !== 'Semua') {
+                setNewCount(prev => prev + 1);
+            }
+
+            addToast({
+                type: 'terlambat',
+                title: '⏰ Izin Terlambat Baru',
+                message: `${d.student_name} — ${d.classroom}`,
+            });
+        }
+
+        if (d.action === 'approved') {
+            setPendingCount(prev => Math.max(0, prev - 1));
+            addToast({
+                type: 'approved',
+                title: '✅ Izin Terlambat Disetujui',
+                message: `${d.student_name} — ${d.classroom}`,
+            });
+        }
+
+        if (d.action === 'rejected') {
+            setPendingCount(prev => Math.max(0, prev - 1));
+            addToast({
+                type: 'rejected',
+                title: '❌ Izin Terlambat Ditolak',
+                message: `${d.student_name} — ${d.classroom}`,
+            });
+        }
+
+        // Reload data jika filter cocok dengan status yang berubah
+        const shouldReload =
+            filter === 'Semua' ||
+            (filter === 'Pending' && d.late_permission_status === 'Pending') ||
+            (filter === 'Approved' && d.action === 'approved') ||
+            (filter === 'Rejected' && d.action === 'rejected');
+
+        if (shouldReload) {
+            router.reload({ only: ['requests', 'pendingCount'] });
+        }
+    }, [filter, addToast]));
 
     const applyFilter = (val) => {
         setFilter(val);
+        setNewCount(0); // reset counter saat pindah tab
         router.get('/admin/izin-terlambat', { status: val }, { preserveState: true, replace: true });
     };
 
     return (
         <AuthenticatedLayout title="Izin Terlambat">
             <FlashMessage />
+
+            {/*  Toast real-time */}
+            <RealtimeToast toasts={toasts} onRemove={removeToast} />
+
             <div className="space-y-5">
 
                 {/* Header */}
@@ -123,32 +184,64 @@ export default function IzinTerlambat({ requests, pendingCount, statusFilter }) 
                             }
                         </p>
                     </div>
-                    {pendingCount > 0 && (
-                        <div className="w-10 h-10 bg-amber-100 rounded-full flex items-center justify-center">
-                            <AlertTriangle size={18} className="text-amber-600" />
-                        </div>
-                    )}
+                    <div className="flex items-center gap-2">
+                        {/* 🔴 Indikator real-time aktif */}
+                        <span className="flex items-center gap-1.5 text-xs text-green-600 font-medium">
+                            <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                            Real-time
+                        </span>
+                        {pendingCount > 0 && (
+                            <div className="w-10 h-10 bg-amber-100 rounded-full flex items-center justify-center">
+                                <AlertTriangle size={18} className="text-amber-600" />
+                            </div>
+                        )}
+                    </div>
                 </div>
 
                 {/* Filter tabs */}
                 <div className="flex gap-2 flex-wrap">
                     {[
-                        { key: 'Pending',  label: `Menunggu${pendingCount > 0 ? ` (${pendingCount})` : ''}` },
+                        { key: 'Pending',  label: 'Menunggu', count: pendingCount },
                         { key: 'Approved', label: 'Disetujui' },
                         { key: 'Rejected', label: 'Ditolak'   },
                         { key: 'Semua',    label: 'Semua'     },
-                    ].map(({ key, label }) => (
+                    ].map(({ key, label, count }) => (
                         <button
                             key={key}
                             onClick={() => applyFilter(key)}
-                            className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-colors
+                            className={`relative px-4 py-1.5 rounded-lg text-xs font-semibold transition-colors
                                 ${filter === key
                                     ? 'bg-blue-600 text-white'
                                     : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'}`}
                         >
                             {label}
+                            {/* Badge count */}
+                            {count > 0 && (
+                                <span className="ml-1.5 inline-flex items-center justify-center
+                                                 min-w-4 h-4 px-1 rounded-full bg-amber-500 text-white text-xs font-bold">
+                                    {count}
+                                </span>
+                            )}
+                            {/*  Dot notif baru untuk tab lain */}
+                            {key !== 'Pending' && key === filter && newCount > 0 && (
+                                <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full
+                                                 flex items-center justify-center text-white text-xs animate-pulse" />
+                            )}
                         </button>
                     ))}
+
+                    {/*  Banner notif ada data baru */}
+                    {newCount > 0 && filter !== 'Pending' && (
+                        <button
+                            onClick={() => applyFilter('Pending')}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold
+                                       bg-amber-50 border border-amber-200 text-amber-700 hover:bg-amber-100
+                                       transition-colors animate-pulse"
+                        >
+                            <Bell size={12} />
+                            {newCount} izin terlambat baru — Lihat
+                        </button>
+                    )}
                 </div>
 
                 {/* List kartu */}

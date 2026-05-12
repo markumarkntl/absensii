@@ -1,12 +1,15 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { router, useForm } from '@inertiajs/react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import FlashMessage from '@/Components/FlashMessage';
+import useEcho from '@/Hooks/useEcho';
+import useToast from '@/Hooks/useToast';
+import RealtimeToast from '@/Components/RealtimeToast';
 import {
     FileText, Clock, CheckCircle2, XCircle,
     ChevronLeft, ChevronRight, Eye, Check, X,
     Calendar, User, BookOpen, AlertCircle,
-    Filter,
+    Filter, Bell,
 } from 'lucide-react';
 
 // ── Badge status ───────────────────────────────────────────────────────────────
@@ -51,16 +54,28 @@ function dateRange(start, end) {
     return s === e ? s : `${s} – ${e}`;
 }
 
+// ── Helper row ─────────────────────────────────────────────────────────────────
+function Row({ icon: Icon, label, value, mono = false }) {
+    return (
+        <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2 text-slate-500 text-sm">
+                <Icon size={13} />
+                <span>{label}</span>
+            </div>
+            <span className={`text-sm font-semibold text-slate-700 truncate max-w-[55%] text-right
+                              ${mono ? 'font-mono tracking-wider' : ''}`}>
+                {value}
+            </span>
+        </div>
+    );
+}
+
 // ── Modal Detail + Approval ────────────────────────────────────────────────────
 function DetailModal({ permission, onClose }) {
     const { data, setData, patch, processing, errors, reset } = useForm({
         action: '',
         note: '',
     });
-
-    const handleAction = (action) => {
-        setData('action', action);
-    };
 
     const submit = () => {
         if (!data.action) return;
@@ -78,32 +93,28 @@ function DetailModal({ permission, onClose }) {
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-
             <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden">
+
                 {/* Header */}
                 <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
                     <div className="flex items-center gap-2">
                         <FileText size={18} className="text-blue-600" />
                         <h2 className="text-base font-bold text-slate-800">Detail Pengajuan Izin</h2>
                     </div>
-                    <button
-                        onClick={onClose}
-                        className="p-1.5 rounded-lg hover:bg-slate-100 transition-colors text-slate-500"
-                    >
+                    <button onClick={onClose}
+                        className="p-1.5 rounded-lg hover:bg-slate-100 transition-colors text-slate-500">
                         <X size={16} />
                     </button>
                 </div>
 
                 {/* Body */}
                 <div className="px-6 py-5 space-y-4 max-h-[70vh] overflow-y-auto">
-                    {/* Info siswa */}
                     <div className="bg-slate-50 rounded-xl p-4 space-y-2.5">
-                        <Row icon={User} label="Nama Siswa"  value={user?.name ?? '-'} />
-                        <Row icon={BookOpen} label="Kelas"   value={classroom?.nama_kelas ?? '-'} />
-                        <Row icon={FileText} label="NISN"    value={student?.nisn ?? '-'} mono />
+                        <Row icon={User}     label="Nama Siswa" value={user?.name ?? '-'} />
+                        <Row icon={BookOpen} label="Kelas"      value={classroom?.nama_kelas ?? '-'} />
+                        <Row icon={FileText} label="NISN"       value={student?.nisn ?? '-'} mono />
                     </div>
 
-                    {/* Info izin */}
                     <div className="space-y-3">
                         <div className="flex items-center justify-between">
                             <span className="text-sm text-slate-500 font-medium">Jenis Izin</span>
@@ -127,22 +138,16 @@ function DetailModal({ permission, onClose }) {
                             </p>
                         </div>
 
-                        {/* Bukti surat */}
                         {permission.proof_file && (
                             <div>
                                 <p className="text-sm text-slate-500 font-medium mb-1">Bukti / Surat</p>
-                                <a
-                                    href={`/storage/${permission.proof_file}`}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="inline-flex items-center gap-2 text-sm text-blue-600 hover:underline"
-                                >
+                                <a href={`/storage/${permission.proof_file}`} target="_blank" rel="noreferrer"
+                                    className="inline-flex items-center gap-2 text-sm text-blue-600 hover:underline">
                                     <Eye size={14} /> Lihat File
                                 </a>
                             </div>
                         )}
 
-                        {/* Info approval jika sudah diproses */}
                         {!isPending && permission.approved_by && (
                             <div className="bg-slate-50 rounded-xl p-3 space-y-1.5 border border-slate-200">
                                 <p className="text-xs text-slate-500 font-semibold uppercase tracking-wide">Info Proses</p>
@@ -156,31 +161,25 @@ function DetailModal({ permission, onClose }) {
                         )}
                     </div>
 
-                    {/* Form approval — hanya jika masih Pending */}
+                    {/* Form approval */}
                     {isPending && (
                         <div className="border-t border-slate-100 pt-4 space-y-3">
                             <p className="text-sm font-semibold text-slate-700">Keputusan</p>
                             <div className="flex gap-2">
-                                <button
-                                    type="button"
-                                    onClick={() => handleAction('Approved')}
+                                <button type="button" onClick={() => setData('action', 'Approved')}
                                     className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl
                                         text-sm font-semibold border-2 transition-all
                                         ${data.action === 'Approved'
                                             ? 'bg-green-600 border-green-600 text-white shadow-md'
-                                            : 'border-green-300 text-green-700 hover:bg-green-50'}`}
-                                >
+                                            : 'border-green-300 text-green-700 hover:bg-green-50'}`}>
                                     <Check size={15} /> Setujui
                                 </button>
-                                <button
-                                    type="button"
-                                    onClick={() => handleAction('Rejected')}
+                                <button type="button" onClick={() => setData('action', 'Rejected')}
                                     className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl
                                         text-sm font-semibold border-2 transition-all
                                         ${data.action === 'Rejected'
                                             ? 'bg-red-600 border-red-600 text-white shadow-md'
-                                            : 'border-red-300 text-red-700 hover:bg-red-50'}`}
-                                >
+                                            : 'border-red-300 text-red-700 hover:bg-red-50'}`}>
                                     <X size={15} /> Tolak
                                 </button>
                             </div>
@@ -203,15 +202,12 @@ function DetailModal({ permission, onClose }) {
                             )}
 
                             {data.action && (
-                                <button
-                                    onClick={submit}
-                                    disabled={processing}
+                                <button onClick={submit} disabled={processing}
                                     className={`w-full py-2.5 rounded-xl text-sm font-bold transition-all
                                         disabled:opacity-60
                                         ${data.action === 'Approved'
                                             ? 'bg-green-600 hover:bg-green-700 text-white'
-                                            : 'bg-red-600 hover:bg-red-700 text-white'}`}
-                                >
+                                            : 'bg-red-600 hover:bg-red-700 text-white'}`}>
                                     {processing ? 'Memproses...' : (data.action === 'Approved' ? 'Konfirmasi Setujui' : 'Konfirmasi Tolak')}
                                 </button>
                             )}
@@ -219,22 +215,6 @@ function DetailModal({ permission, onClose }) {
                     )}
                 </div>
             </div>
-        </div>
-    );
-}
-
-// ── Helper row detail ──────────────────────────────────────────────────────────
-function Row({ icon: Icon, label, value, mono = false }) {
-    return (
-        <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2 text-slate-500 text-sm">
-                <Icon size={13} />
-                <span>{label}</span>
-            </div>
-            <span className={`text-sm font-semibold text-slate-700 truncate max-w-[55%] text-right
-                              ${mono ? 'font-mono tracking-wider' : ''}`}>
-                {value}
-            </span>
         </div>
     );
 }
@@ -249,11 +229,8 @@ function Pagination({ meta, onPage }) {
                          px-4 py-3 border-t border-slate-100 text-sm text-slate-500">
             <span>Menampilkan {from}–{to} dari {total} pengajuan</span>
             <div className="flex items-center gap-1">
-                <button
-                    onClick={() => onPage(current_page - 1)}
-                    disabled={current_page === 1}
-                    className="p-1.5 rounded-lg hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                >
+                <button onClick={() => onPage(current_page - 1)} disabled={current_page === 1}
+                    className="p-1.5 rounded-lg hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
                     <ChevronLeft size={16} />
                 </button>
                 {Array.from({ length: last_page }, (_, i) => i + 1)
@@ -266,22 +243,16 @@ function Pagination({ meta, onPage }) {
                     .map((p, i) =>
                         p === '...'
                             ? <span key={`e${i}`} className="px-2 text-slate-400">...</span>
-                            : <button
-                                key={p}
-                                onClick={() => onPage(p)}
+                            : <button key={p} onClick={() => onPage(p)}
                                 className={`w-8 h-8 rounded-lg text-sm font-medium transition-colors
                                     ${p === current_page
                                         ? 'bg-blue-600 text-white'
-                                        : 'hover:bg-slate-100 text-slate-600'}`}
-                              >
+                                        : 'hover:bg-slate-100 text-slate-600'}`}>
                                 {p}
                               </button>
                     )}
-                <button
-                    onClick={() => onPage(current_page + 1)}
-                    disabled={current_page === last_page}
-                    className="p-1.5 rounded-lg hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                >
+                <button onClick={() => onPage(current_page + 1)} disabled={current_page === last_page}
+                    className="p-1.5 rounded-lg hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
                     <ChevronRight size={16} />
                 </button>
             </div>
@@ -290,17 +261,80 @@ function Pagination({ meta, onPage }) {
 }
 
 // ── Main Page ──────────────────────────────────────────────────────────────────
-export default function IzinIndex({ permissions, counts, filterStatus }) {
-    const [selected, setSelected] = useState(null);
+export default function IzinIndex({ permissions, counts: initialCounts, filterStatus }) {
+    const [selected, setSelected]   = useState(null);
+    const [counts, setCounts]       = useState(initialCounts);
+    const [newCount, setNewCount]   = useState(0); // 🔴 notif izin baru belum dilihat
+    const { toasts, addToast, removeToast } = useToast();
+
+    // 🔴 Listen event izin baru / diproses
+    useEcho('admin.permission', 'permission.updated', useCallback((payload) => {
+        const d = payload.data;
+
+        if (d.action === 'new') {
+            // Tambah pending count
+            setCounts(prev => ({ ...prev, pending: prev.pending + 1 }));
+
+            // Kalau admin sedang tidak di tab Pending, tampilkan dot notif
+            if (filterStatus !== 'Pending' && filterStatus !== 'all') {
+                setNewCount(prev => prev + 1);
+            }
+
+            addToast({
+                type: 'izin',
+                title: `📋 Izin ${d.type} Baru`,
+                message: `${d.student_name} — ${d.classroom} · ${dateRange(d.start_date, d.end_date)}`,
+            });
+
+            // Reload jika sedang di tab Pending atau Semua
+            if (filterStatus === 'Pending' || filterStatus === 'all') {
+                router.reload({ only: ['permissions', 'counts'] });
+            }
+        }
+
+        if (d.action === 'approved') {
+            setCounts(prev => ({
+                ...prev,
+                pending:  Math.max(0, prev.pending - 1),
+                approved: prev.approved + 1,
+            }));
+            addToast({
+                type: 'approved',
+                title: '✅ Izin Disetujui',
+                message: `${d.student_name} — ${d.type}`,
+            });
+            if (filterStatus === 'Approved' || filterStatus === 'all') {
+                router.reload({ only: ['permissions', 'counts'] });
+            }
+        }
+
+        if (d.action === 'rejected') {
+            setCounts(prev => ({
+                ...prev,
+                pending:  Math.max(0, prev.pending - 1),
+                rejected: prev.rejected + 1,
+            }));
+            addToast({
+                type: 'rejected',
+                title: '❌ Izin Ditolak',
+                message: `${d.student_name} — ${d.type}`,
+            });
+            if (filterStatus === 'Rejected' || filterStatus === 'all') {
+                router.reload({ only: ['permissions', 'counts'] });
+            }
+        }
+    }, [filterStatus, addToast]));
 
     const tabs = [
-        { key: 'Pending',  label: 'Menunggu',  count: counts.pending,  icon: Clock,         color: 'text-amber-600'  },
-        { key: 'Approved', label: 'Disetujui', count: counts.approved, icon: CheckCircle2,  color: 'text-green-600'  },
-        { key: 'Rejected', label: 'Ditolak',   count: counts.rejected, icon: XCircle,       color: 'text-red-500'    },
-        { key: 'all',      label: 'Semua',     count: counts.pending + counts.approved + counts.rejected, icon: Filter, color: 'text-slate-500' },
+        { key: 'Pending',  label: 'Menunggu',  count: counts.pending,  icon: Clock,        color: 'text-amber-600' },
+        { key: 'Approved', label: 'Disetujui', count: counts.approved, icon: CheckCircle2, color: 'text-green-600' },
+        { key: 'Rejected', label: 'Ditolak',   count: counts.rejected, icon: XCircle,      color: 'text-red-500'   },
+        { key: 'all',      label: 'Semua',     count: counts.pending + counts.approved + counts.rejected,
+          icon: Filter, color: 'text-slate-500' },
     ];
 
     const handleTab = (key) => {
+        setNewCount(0); // reset saat pindah tab
         router.get(route('admin.izin'), { status: key }, { preserveState: true, replace: true });
     };
 
@@ -308,40 +342,65 @@ export default function IzinIndex({ permissions, counts, filterStatus }) {
         router.get(route('admin.izin'), { status: filterStatus, page }, { preserveState: true, replace: true });
     };
 
-    const list  = permissions.data ?? [];
-    const meta  = permissions.meta ?? permissions;
+    const list = permissions.data ?? [];
+    const meta = permissions.meta ?? permissions;
 
     return (
         <AuthenticatedLayout title="Approval Izin">
             <FlashMessage />
 
+            {/* 🔴 Toast real-time */}
+            <RealtimeToast toasts={toasts} onRemove={removeToast} />
+
             <div className="space-y-5">
+
                 {/* Header */}
-                <div>
-                    <h2 className="text-xl font-bold text-slate-800">Pengajuan Izin Siswa</h2>
-                    <p className="text-sm text-slate-500 mt-0.5">Kelola dan proses permohonan izin / sakit dari siswa.</p>
+                <div className="flex items-center justify-between">
+                    <div>
+                        <h2 className="text-xl font-bold text-slate-800">Pengajuan Izin Siswa</h2>
+                        <p className="text-sm text-slate-500 mt-0.5">Kelola dan proses permohonan izin / sakit dari siswa.</p>
+                    </div>
+                    {/* 🔴 Indikator real-time */}
+                    <span className="flex items-center gap-1.5 text-xs text-green-600 font-medium">
+                        <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                        Real-time
+                    </span>
                 </div>
+
+                {/*  Banner izin baru jika admin sedang di tab lain */}
+                {newCount > 0 && filterStatus !== 'Pending' && (
+                    <button
+                        onClick={() => handleTab('Pending')}
+                        className="w-full flex items-center gap-2 px-4 py-3 rounded-xl text-sm font-semibold
+                                   bg-amber-50 border border-amber-200 text-amber-700 hover:bg-amber-100
+                                   transition-colors animate-pulse"
+                    >
+                        <Bell size={16} />
+                        {newCount} pengajuan izin baru menunggu persetujuan — Klik untuk lihat
+                    </button>
+                )}
 
                 {/* Tab Status */}
                 <div className="flex gap-2 flex-wrap">
                     {tabs.map(({ key, label, count, icon: Icon, color }) => {
                         const active = filterStatus === key;
                         return (
-                            <button
-                                key={key}
-                                onClick={() => handleTab(key)}
-                                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold border-2
+                            <button key={key} onClick={() => handleTab(key)}
+                                className={`relative flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold border-2
                                     transition-all duration-150
                                     ${active
                                         ? 'bg-slate-800 border-slate-800 text-white shadow-sm'
-                                        : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50'}`}
-                            >
+                                        : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50'}`}>
                                 <Icon size={14} className={active ? 'text-white' : color} />
                                 {label}
                                 <span className={`px-1.5 py-0.5 rounded-full text-xs
                                     ${active ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'}`}>
                                     {count}
                                 </span>
+                                {/*  Dot notif untuk tab Pending */}
+                                {key === 'Pending' && newCount > 0 && !active && (
+                                    <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full animate-pulse" />
+                                )}
                             </button>
                         );
                     })}
@@ -349,7 +408,7 @@ export default function IzinIndex({ permissions, counts, filterStatus }) {
 
                 {/* Tabel */}
                 <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
-                    {/* Desktop table */}
+                    {/* Desktop */}
                     <div className="hidden md:block overflow-x-auto">
                         <table className="w-full text-sm">
                             <thead>
@@ -372,13 +431,8 @@ export default function IzinIndex({ permissions, counts, filterStatus }) {
                                         </td>
                                     </tr>
                                 ) : list.map((item, idx) => (
-                                    <tr
-                                        key={item.id}
-                                        className="hover:bg-slate-50/80 transition-colors"
-                                    >
-                                        <td className="px-5 py-3.5 text-slate-400 text-xs">
-                                            {(meta.from ?? 1) + idx}
-                                        </td>
+                                    <tr key={item.id} className="hover:bg-slate-50/80 transition-colors">
+                                        <td className="px-5 py-3.5 text-slate-400 text-xs">{(meta.from ?? 1) + idx}</td>
                                         <td className="px-5 py-3.5">
                                             <div className="flex items-center gap-3">
                                                 <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center
@@ -393,24 +447,14 @@ export default function IzinIndex({ permissions, counts, filterStatus }) {
                                                 </div>
                                             </div>
                                         </td>
-                                        <td className="px-4 py-3.5">
-                                            <TypeBadge type={item.type} />
-                                        </td>
-                                        <td className="px-4 py-3.5 text-slate-600">
-                                            {dateRange(item.start_date, item.end_date)}
-                                        </td>
-                                        <td className="px-4 py-3.5 text-slate-500 text-xs">
-                                            {formatDate(item.created_at)}
-                                        </td>
-                                        <td className="px-4 py-3.5">
-                                            <StatusBadge status={item.is_approved} />
-                                        </td>
+                                        <td className="px-4 py-3.5"><TypeBadge type={item.type} /></td>
+                                        <td className="px-4 py-3.5 text-slate-600">{dateRange(item.start_date, item.end_date)}</td>
+                                        <td className="px-4 py-3.5 text-slate-500 text-xs">{formatDate(item.created_at)}</td>
+                                        <td className="px-4 py-3.5"><StatusBadge status={item.is_approved} /></td>
                                         <td className="px-4 py-3.5 text-right">
-                                            <button
-                                                onClick={() => setSelected(item)}
+                                            <button onClick={() => setSelected(item)}
                                                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold
-                                                    bg-slate-100 text-slate-600 hover:bg-blue-50 hover:text-blue-600 transition-colors"
-                                            >
+                                                    bg-slate-100 text-slate-600 hover:bg-blue-50 hover:text-blue-600 transition-colors">
                                                 <Eye size={13} />
                                                 {item.is_approved === 'Pending' ? 'Proses' : 'Detail'}
                                             </button>
@@ -421,7 +465,7 @@ export default function IzinIndex({ permissions, counts, filterStatus }) {
                         </table>
                     </div>
 
-                    {/* Mobile cards */}
+                    {/* Mobile */}
                     <div className="md:hidden divide-y divide-slate-100">
                         {list.length === 0 ? (
                             <div className="text-center py-12 text-slate-400">
@@ -443,7 +487,6 @@ export default function IzinIndex({ permissions, counts, filterStatus }) {
                                     </div>
                                     <StatusBadge status={item.is_approved} />
                                 </div>
-
                                 <div className="mt-3 flex flex-wrap gap-2 items-center text-xs text-slate-500">
                                     <TypeBadge type={item.type} />
                                     <span className="flex items-center gap-1">
@@ -451,12 +494,9 @@ export default function IzinIndex({ permissions, counts, filterStatus }) {
                                         {dateRange(item.start_date, item.end_date)}
                                     </span>
                                 </div>
-
-                                <button
-                                    onClick={() => setSelected(item)}
+                                <button onClick={() => setSelected(item)}
                                     className="mt-3 w-full flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold
-                                        bg-slate-100 text-slate-600 hover:bg-blue-50 hover:text-blue-600 transition-colors"
-                                >
+                                        bg-slate-100 text-slate-600 hover:bg-blue-50 hover:text-blue-600 transition-colors">
                                     <Eye size={13} />
                                     {item.is_approved === 'Pending' ? 'Proses Izin' : 'Lihat Detail'}
                                 </button>
@@ -464,17 +504,12 @@ export default function IzinIndex({ permissions, counts, filterStatus }) {
                         ))}
                     </div>
 
-                    {/* Pagination */}
                     <Pagination meta={meta} onPage={handlePage} />
                 </div>
             </div>
 
-            {/* Modal detail */}
             {selected && (
-                <DetailModal
-                    permission={selected}
-                    onClose={() => setSelected(null)}
-                />
+                <DetailModal permission={selected} onClose={() => setSelected(null)} />
             )}
         </AuthenticatedLayout>
     );

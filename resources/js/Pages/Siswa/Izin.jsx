@@ -1,19 +1,22 @@
-import { useState } from 'react';
-import { useForm } from '@inertiajs/react';
+import { useState, useCallback } from 'react';
+import { useForm, usePage } from '@inertiajs/react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import FlashMessage from '@/Components/FlashMessage';
+import useEcho from '@/Hooks/useEcho';
+import useToast from '@/Hooks/useToast';
+import RealtimeToast from '@/Components/RealtimeToast';
 import {
-    FileText, Plus, X, Upload, Calendar, Loader2,
+    FileText, Plus, X, Upload, Calendar,
+    Loader2, CheckCircle2, XCircle, Bell,
 } from 'lucide-react';
 
-// ── Konfigurasi status ─────────────────────────────────────────────────────────
+// ── Status config ──────────────────────────────────────────────────────────────
 const STATUS_CFG = {
     Pending:  { label: 'Menunggu',  bg: 'bg-amber-100', text: 'text-amber-700' },
     Approved: { label: 'Disetujui', bg: 'bg-green-100', text: 'text-green-700' },
     Rejected: { label: 'Ditolak',   bg: 'bg-red-100',   text: 'text-red-700'   },
 };
 
-// ── Badge status ───────────────────────────────────────────────────────────────
 function StatusBadge({ status }) {
     const cfg = STATUS_CFG[status] ?? { label: status, bg: 'bg-slate-100', text: 'text-slate-600' };
     return (
@@ -32,15 +35,11 @@ function IzinModal({ onClose }) {
         reason: '',
         proof_file: null,
     });
-
     const [fileName, setFileName] = useState('');
 
     const handleFile = (e) => {
         const file = e.target.files[0];
-        if (file) {
-            setData('proof_file', file);
-            setFileName(file.name);
-        }
+        if (file) { setData('proof_file', file); setFileName(file.name); }
     };
 
     const submit = (e) => {
@@ -57,26 +56,22 @@ function IzinModal({ onClose }) {
             <div className="relative w-full sm:max-w-lg bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl overflow-hidden">
                 <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
                     <h3 className="font-bold text-slate-800">Ajukan Izin / Sakit</h3>
-                    <button
-                        onClick={onClose}
-                        className="w-8 h-8 rounded-xl bg-slate-100 flex items-center justify-center hover:bg-slate-200 transition-colors"
-                    >
+                    <button onClick={onClose}
+                        className="w-8 h-8 rounded-xl bg-slate-100 flex items-center justify-center hover:bg-slate-200 transition-colors">
                         <X size={16} className="text-slate-600" />
                     </button>
                 </div>
 
                 <form onSubmit={submit} className="p-5 space-y-4 max-h-[70vh] overflow-y-auto">
-                    {/* Tipe */}
                     <div>
                         <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Tipe Pengajuan</label>
                         <div className="grid grid-cols-2 gap-2">
                             {['Izin', 'Sakit'].map((t) => (
-                                <button
-                                    key={t}
-                                    type="button"
-                                    onClick={() => setData('type', t)}
-                                    className={`py-2.5 rounded-xl text-sm font-semibold border-2 transition-all ${data.type === t ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}
-                                >
+                                <button key={t} type="button" onClick={() => setData('type', t)}
+                                    className={`py-2.5 rounded-xl text-sm font-semibold border-2 transition-all
+                                        ${data.type === t
+                                            ? 'border-blue-500 bg-blue-50 text-blue-700'
+                                            : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}>
                                     {t}
                                 </button>
                             ))}
@@ -84,19 +79,16 @@ function IzinModal({ onClose }) {
                         {errors.type && <p className="text-xs text-red-500 mt-1">{errors.type}</p>}
                     </div>
 
-                    {/* Tanggal */}
                     <div className="grid grid-cols-2 gap-3">
                         <div>
                             <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Dari Tanggal</label>
                             <div className="relative">
                                 <Calendar size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                                <input
-                                    type="date"
-                                    value={data.start_date}
+                                <input type="date" value={data.start_date}
                                     onChange={e => setData('start_date', e.target.value)}
                                     min={new Date().toISOString().split('T')[0]}
-                                    className="w-full pl-8 pr-3 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                />
+                                    className="w-full pl-8 pr-3 py-2.5 rounded-xl border border-slate-200 text-sm
+                                               focus:outline-none focus:ring-2 focus:ring-blue-500" />
                             </div>
                             {errors.start_date && <p className="text-xs text-red-500 mt-1">{errors.start_date}</p>}
                         </div>
@@ -104,37 +96,31 @@ function IzinModal({ onClose }) {
                             <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Sampai Tanggal</label>
                             <div className="relative">
                                 <Calendar size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                                <input
-                                    type="date"
-                                    value={data.end_date}
+                                <input type="date" value={data.end_date}
                                     onChange={e => setData('end_date', e.target.value)}
                                     min={data.start_date || new Date().toISOString().split('T')[0]}
-                                    className="w-full pl-8 pr-3 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                />
+                                    className="w-full pl-8 pr-3 py-2.5 rounded-xl border border-slate-200 text-sm
+                                               focus:outline-none focus:ring-2 focus:ring-blue-500" />
                             </div>
                             {errors.end_date && <p className="text-xs text-red-500 mt-1">{errors.end_date}</p>}
                         </div>
                     </div>
 
-                    {/* Alasan */}
                     <div>
                         <label className="text-xs font-semibold text-slate-600 mb-1.5 block">Alasan</label>
-                        <textarea
-                            value={data.reason}
-                            onChange={e => setData('reason', e.target.value)}
-                            rows={3}
-                            placeholder="Jelaskan alasan izin / sakit kamu..."
-                            className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        />
+                        <textarea value={data.reason} onChange={e => setData('reason', e.target.value)}
+                            rows={3} placeholder="Jelaskan alasan izin / sakit kamu..."
+                            className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm resize-none
+                                       focus:outline-none focus:ring-2 focus:ring-blue-500" />
                         {errors.reason && <p className="text-xs text-red-500 mt-1">{errors.reason}</p>}
                     </div>
 
-                    {/* Bukti */}
                     <div>
                         <label className="text-xs font-semibold text-slate-600 mb-1.5 block">
                             Bukti Surat <span className="text-slate-400 font-normal">(opsional · PDF/JPG/PNG, maks 5MB)</span>
                         </label>
-                        <label className={`flex items-center gap-3 px-4 py-3 rounded-xl border-2 border-dashed cursor-pointer transition-colors ${fileName ? 'border-blue-300 bg-blue-50' : 'border-slate-200 hover:border-slate-300 bg-slate-50'}`}>
+                        <label className={`flex items-center gap-3 px-4 py-3 rounded-xl border-2 border-dashed cursor-pointer transition-colors
+                            ${fileName ? 'border-blue-300 bg-blue-50' : 'border-slate-200 hover:border-slate-300 bg-slate-50'}`}>
                             <Upload size={16} className={fileName ? 'text-blue-500' : 'text-slate-400'} />
                             <span className={`text-sm truncate ${fileName ? 'text-blue-700 font-medium' : 'text-slate-500'}`}>
                                 {fileName || 'Klik untuk upload file bukti'}
@@ -144,12 +130,10 @@ function IzinModal({ onClose }) {
                         {errors.proof_file && <p className="text-xs text-red-500 mt-1">{errors.proof_file}</p>}
                     </div>
 
-                    {/* Submit */}
-                    <button
-                        type="submit"
-                        disabled={processing}
-                        className="w-full py-3 rounded-xl bg-blue-600 text-white text-sm font-bold hover:bg-blue-700 active:bg-blue-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                    >
+                    <button type="submit" disabled={processing}
+                        className="w-full py-3 rounded-xl bg-blue-600 text-white text-sm font-bold
+                                   hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed
+                                   flex items-center justify-center gap-2 transition-colors">
                         {processing
                             ? <><Loader2 size={16} className="animate-spin" /> Mengirim...</>
                             : <><FileText size={16} /> Kirim Pengajuan</>
@@ -162,14 +146,16 @@ function IzinModal({ onClose }) {
 }
 
 // ── Card izin ──────────────────────────────────────────────────────────────────
-function IzinCard({ item }) {
+function IzinCard({ item, isNew }) {
     const isMultiDay = item.start_date !== item.end_date;
 
     return (
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4">
+        <div className={`bg-white rounded-2xl border shadow-sm p-4 transition-all
+            ${isNew ? 'border-blue-300 ring-2 ring-blue-100' : 'border-slate-200'}`}>
             <div className="flex items-start justify-between gap-3">
                 <div className="flex items-center gap-3 min-w-0">
-                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${item.type === 'Sakit' ? 'bg-blue-50' : 'bg-purple-50'}`}>
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0
+                        ${item.type === 'Sakit' ? 'bg-blue-50' : 'bg-purple-50'}`}>
                         <FileText size={18} className={item.type === 'Sakit' ? 'text-blue-600' : 'text-purple-600'} />
                     </div>
                     <div className="min-w-0">
@@ -180,20 +166,21 @@ function IzinCard({ item }) {
                         </p>
                     </div>
                 </div>
-                <StatusBadge status={item.is_approved} />
+                <div className="flex flex-col items-end gap-1">
+                    <StatusBadge status={item.is_approved} />
+                    {isNew && (
+                        <span className="text-xs text-blue-600 font-semibold flex items-center gap-1">
+                            <Bell size={10} /> Baru diperbarui
+                        </span>
+                    )}
+                </div>
             </div>
             <p className="text-xs text-slate-600 mt-3 leading-relaxed line-clamp-2">{item.reason}</p>
             <div className="flex items-center justify-between mt-3 pt-3 border-t border-slate-50">
-                <span className="text-xs text-slate-400">
-                    Diajukan {item.created_at_formatted}
-                </span>
+                <span className="text-xs text-slate-400">Diajukan {item.created_at_formatted}</span>
                 {item.proof_file && (
-                    <a
-                        href={`/storage/${item.proof_file}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-xs text-blue-600 font-medium hover:underline"
-                    >
+                    <a href={`/storage/${item.proof_file}`} target="_blank" rel="noopener noreferrer"
+                        className="text-xs text-blue-600 font-medium hover:underline">
                         Lihat Bukti
                     </a>
                 )}
@@ -205,19 +192,15 @@ function IzinCard({ item }) {
 // ── Pagination ─────────────────────────────────────────────────────────────────
 function Pagination({ links }) {
     if (!links || links.length <= 3) return null;
-
     const getClass = (link) => {
         if (link.active) return 'bg-blue-600 text-white';
         if (link.url) return 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50';
         return 'bg-white border border-slate-100 text-slate-300 cursor-not-allowed';
     };
-
     return (
         <div className="flex items-center justify-center gap-1">
             {links.map((link, i) => (
-                <a
-                    key={i}
-                    href={link.url ?? '#'}
+                <a key={i} href={link.url ?? '#'}
                     className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${getClass(link)}`}
                     dangerouslySetInnerHTML={{ __html: link.label }}
                     onClick={(e) => { if (!link.url) e.preventDefault(); }}
@@ -229,32 +212,104 @@ function Pagination({ links }) {
 
 // ── Main Page ──────────────────────────────────────────────────────────────────
 export default function IzinIndex({ permissions }) {
-    const [showModal, setShowModal] = useState(false);
-    const items = permissions?.data ?? [];
+    const { auth } = usePage().props;
+    const studentId = auth?.student_id;
 
+    const [showModal, setShowModal]     = useState(false);
+    const [updatedIds, setUpdatedIds]   = useState(new Set()); // 🔴 ID izin yang baru diupdate
+    const [notification, setNotification] = useState(null);   // 🔴 Banner notif
+    const { toasts, addToast, removeToast } = useToast();
+
+    const items    = permissions?.data ?? [];
     const pending  = items.filter(i => i.is_approved === 'Pending').length;
     const approved = items.filter(i => i.is_approved === 'Approved').length;
     const rejected = items.filter(i => i.is_approved === 'Rejected').length;
 
+    // 🔴 Listen status izin berubah dari admin
+    useEcho(
+        `siswa.${studentId}`,
+        'permission.status-changed',
+        useCallback((payload) => {
+            const d = payload.data;
+
+            // Tandai ID izin yang berubah (highlight kartu)
+            setUpdatedIds(prev => new Set([...prev, d.id]));
+
+            // Hapus highlight setelah 10 detik
+            setTimeout(() => {
+                setUpdatedIds(prev => {
+                    const next = new Set(prev);
+                    next.delete(d.id);
+                    return next;
+                });
+            }, 10_000);
+
+            const isApproved = d.is_approved === 'Approved';
+
+            // Banner notif di atas halaman
+            setNotification({
+                type: isApproved ? 'approved' : 'rejected',
+                message: isApproved
+                    ? `✅ Izin ${d.type} kamu telah disetujui!`
+                    : `❌ Izin ${d.type} kamu ditolak.`,
+            });
+
+            // Toast pop-up
+            addToast({
+                type: isApproved ? 'approved' : 'rejected',
+                title: isApproved ? '✅ Izin Disetujui' : '❌ Izin Ditolak',
+                message: `Izin ${d.type} · ${d.start_date}`,
+            });
+
+            // Reload data agar status kartu ikut berubah
+            // Gunakan dynamic import untuk menghindari circular
+            import('@inertiajs/react').then(({ router }) => {
+                router.reload({ only: ['permissions'] });
+            });
+        }, [addToast])
+    );
+
     return (
         <AuthenticatedLayout title="Pengajuan Izin">
             <FlashMessage />
+
+            {/* 🔴 Toast real-time */}
+            <RealtimeToast toasts={toasts} onRemove={removeToast} />
+
             {showModal && <IzinModal onClose={() => setShowModal(false)} />}
 
             <div className="space-y-5">
+
                 {/* Header */}
                 <div className="flex items-center justify-between flex-wrap gap-3">
                     <div>
                         <h2 className="text-xl font-bold text-slate-800">Pengajuan Izin</h2>
                         <p className="text-sm text-slate-500 mt-0.5">Kelola izin dan surat sakit kamu</p>
                     </div>
-                    <button
-                        onClick={() => setShowModal(true)}
-                        className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 transition-colors shadow-sm"
-                    >
+                    <button onClick={() => setShowModal(true)}
+                        className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 text-white
+                                   text-sm font-semibold hover:bg-blue-700 transition-colors shadow-sm">
                         <Plus size={16} /> Ajukan Izin
                     </button>
                 </div>
+
+                {/*  Banner notif status berubah */}
+                {notification && (
+                    <div className={`flex items-center gap-3 px-4 py-3 rounded-2xl border text-sm font-semibold
+                        ${notification.type === 'approved'
+                            ? 'bg-green-50 border-green-200 text-green-700'
+                            : 'bg-red-50 border-red-200 text-red-700'}`}>
+                        {notification.type === 'approved'
+                            ? <CheckCircle2 size={18} />
+                            : <XCircle size={18} />
+                        }
+                        <span className="flex-1">{notification.message}</span>
+                        <button onClick={() => setNotification(null)}
+                            className="opacity-60 hover:opacity-100 transition-opacity">
+                            <X size={16} />
+                        </button>
+                    </div>
+                )}
 
                 {/* Ringkasan */}
                 <div className="grid grid-cols-3 gap-3">
@@ -281,11 +336,12 @@ export default function IzinIndex({ permissions }) {
                     </div>
                 ) : (
                     <div className="space-y-3">
-                        {items.map((item, i) => <IzinCard key={i} item={item} />)}
+                        {items.map((item, i) => (
+                            <IzinCard key={i} item={item} isNew={updatedIds.has(item.id)} />
+                        ))}
                     </div>
                 )}
 
-                {/* Pagination */}
                 <Pagination links={permissions?.links} />
             </div>
         </AuthenticatedLayout>

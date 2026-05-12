@@ -1,14 +1,17 @@
-import { useRef, useState, useEffect } from 'react';
-import { useForm, router } from '@inertiajs/react';
+import { useRef, useState, useEffect, useCallback } from 'react';
+import { useForm, router, usePage } from '@inertiajs/react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import FlashMessage from '@/Components/FlashMessage';
+import useEcho from '@/Hooks/useEcho';
+import useToast from '@/Hooks/useToast';
+import RealtimeToast from '@/Components/RealtimeToast';
 import {
     CheckCircle2, Clock, Camera, Loader2, X,
     ShieldCheck, CalendarDays, AlertTriangle,
-    LogOut, Timer,
+    LogOut, Timer, XCircle,
 } from 'lucide-react';
 
-// ── Jam Real-time ─────────────────────────────────────────────
+// ── Jam Real-time ──────────────────────────────────────────────────────────────
 function LiveClock() {
     const [time, setTime] = useState(new Date());
     useEffect(() => {
@@ -22,7 +25,7 @@ function LiveClock() {
     );
 }
 
-// ── Sudah Check-in ────────────────────────────────────────────
+// ── Sudah Check-in ─────────────────────────────────────────────────────────────
 function AlreadyCheckedIn({ attendance, checkoutOpen, onCheckout, checkingOut }) {
     const isLate     = attendance?.is_late;
     const lateStatus = attendance?.late_permission_status;
@@ -31,6 +34,13 @@ function AlreadyCheckedIn({ attendance, checkoutOpen, onCheckout, checkingOut })
     const now = new Date();
     const [coH, coM] = (checkoutOpen ?? '14:00:00').split(':').map(Number);
     const canCheckout = now.getHours() > coH || (now.getHours() === coH && now.getMinutes() >= coM);
+
+    const lateStatusCfg = {
+        Approved: { label: 'Disetujui', cls: 'bg-green-100 text-green-700' },
+        Rejected: { label: 'Ditolak',   cls: 'bg-red-100 text-red-700'     },
+        Pending:  { label: 'Menunggu Admin', cls: 'bg-amber-100 text-amber-700' },
+    };
+    const lateCfg = lateStatusCfg[lateStatus] ?? lateStatusCfg.Pending;
 
     return (
         <div className="flex flex-col items-center justify-center py-8 text-center space-y-4">
@@ -49,11 +59,11 @@ function AlreadyCheckedIn({ attendance, checkoutOpen, onCheckout, checkingOut })
                 <p className="text-slate-500 text-sm mt-1">
                     {isLate
                         ? 'Kamu hadir terlambat. Izin terlambatmu sedang diproses admin.'
-                        : 'Kamu sudah melakukan absensi hari ini.'}
+                        : 'Kamu sudah melakukan absensi hari ini.'
+                    }
                 </p>
             </div>
 
-            {/* Detail waktu */}
             <div className="bg-slate-50 rounded-2xl border border-slate-200 px-6 py-4 w-full max-w-xs space-y-2.5 text-left">
                 <div className="flex justify-between text-sm">
                     <span className="text-slate-500">Jam Masuk</span>
@@ -64,38 +74,28 @@ function AlreadyCheckedIn({ attendance, checkoutOpen, onCheckout, checkingOut })
                 </div>
                 <div className="flex justify-between text-sm">
                     <span className="text-slate-500">Jam Pulang</span>
-                    <span className="font-semibold text-slate-800">
-                        {attendance?.time_out ?? '—'}
-                    </span>
+                    <span className="font-semibold text-slate-800">{attendance?.time_out ?? '—'}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                     <span className="text-slate-500">Status</span>
                     <span className="font-semibold text-green-600">{attendance?.status ?? '—'}</span>
                 </div>
                 {isLate && lateStatus && (
-                    <div className="flex justify-between text-sm">
+                    <div className="flex justify-between text-sm items-center">
                         <span className="text-slate-500">Izin Terlambat</span>
-                        <span className={`font-semibold text-xs px-2 py-0.5 rounded-full
-                            ${lateStatus === 'Approved' ? 'bg-green-100 text-green-700' :
-                              lateStatus === 'Rejected' ? 'bg-red-100 text-red-700' :
-                              'bg-amber-100 text-amber-700'}`}>
-                            {lateStatus === 'Approved' ? 'Disetujui' :
-                             lateStatus === 'Rejected' ? 'Ditolak' : 'Menunggu Admin'}
+                        <span className={`font-semibold text-xs px-2 py-0.5 rounded-full ${lateCfg.cls}`}>
+                            {lateCfg.label}
                         </span>
                     </div>
                 )}
             </div>
 
-            {/* Tombol Absen Pulang */}
             {!hasOut && (
                 canCheckout ? (
-                    <button
-                        onClick={onCheckout}
-                        disabled={checkingOut}
+                    <button onClick={onCheckout} disabled={checkingOut}
                         className="w-full max-w-xs py-3 rounded-2xl bg-slate-700 text-white text-sm font-bold
                                    hover:bg-slate-800 disabled:opacity-50 flex items-center justify-center gap-2
-                                   shadow-sm transition-colors"
-                    >
+                                   shadow-sm transition-colors">
                         {checkingOut
                             ? <><Loader2 size={16} className="animate-spin" /> Menyimpan...</>
                             : <><LogOut size={16} /> Absen Pulang</>
@@ -119,7 +119,7 @@ function AlreadyCheckedIn({ attendance, checkoutOpen, onCheckout, checkingOut })
     );
 }
 
-// ── Form Check-in ─────────────────────────────────────────────
+// ── Form Check-in ──────────────────────────────────────────────────────────────
 function CheckInForm({ schoolConfig, deadline, attendanceOpen, isLateNow, lateTime }) {
     const fileRef = useRef();
     const [preview, setPreview]           = useState(null);
@@ -166,8 +166,6 @@ function CheckInForm({ schoolConfig, deadline, attendanceOpen, isLateNow, lateTi
 
     return (
         <form onSubmit={submit} className="space-y-5">
-
-            {/* Banner info */}
             <div className={`border rounded-2xl p-4 flex items-start gap-3
                 ${isLateNow ? 'bg-amber-50 border-amber-200' : 'bg-blue-50 border-blue-100'}`}>
                 {isLateNow
@@ -190,7 +188,6 @@ function CheckInForm({ schoolConfig, deadline, attendanceOpen, isLateNow, lateTi
                 </div>
             </div>
 
-            {/* Upload foto */}
             <div className="space-y-2">
                 <label className="text-xs font-semibold text-slate-600 uppercase tracking-wide">
                     Foto Selfie <span className="text-red-500">*</span>
@@ -226,25 +223,18 @@ function CheckInForm({ schoolConfig, deadline, attendanceOpen, isLateNow, lateTi
                 {errors.photo && <p className="text-xs text-red-500">{errors.photo}</p>}
             </div>
 
-            {/* Form alasan terlambat */}
             {isLateNow && showLateForm && (
                 <div className="space-y-2">
                     <label className="text-xs font-semibold text-slate-600 uppercase tracking-wide">
                         Alasan Keterlambatan <span className="text-red-500">*</span>
                     </label>
-                    <textarea
-                        rows={3}
-                        placeholder="Contoh: Ban motor bocor, macet di jalan, dll..."
-                        value={data.late_reason}
-                        onChange={e => setData('late_reason', e.target.value)}
+                    <textarea rows={3} placeholder="Contoh: Ban motor bocor, macet di jalan, dll..."
+                        value={data.late_reason} onChange={e => setData('late_reason', e.target.value)}
                         className="w-full px-3 py-2.5 text-sm rounded-xl border border-amber-200 bg-amber-50
-                                   outline-none focus:ring-2 focus:ring-amber-400 focus:border-amber-400
-                                   transition-colors resize-none text-slate-700 placeholder:text-slate-400"
-                    />
+                                   outline-none focus:ring-2 focus:ring-amber-400 transition-colors resize-none
+                                   text-slate-700 placeholder:text-slate-400" />
                     {errors.late_reason && <p className="text-xs text-red-500">{errors.late_reason}</p>}
-                    <p className="text-xs text-amber-600">
-                        Alasan ini dikirim ke admin untuk persetujuan izin hadir terlambat.
-                    </p>
+                    <p className="text-xs text-amber-600">Alasan ini dikirim ke admin untuk persetujuan izin hadir terlambat.</p>
                 </div>
             )}
 
@@ -261,20 +251,13 @@ function CheckInForm({ schoolConfig, deadline, attendanceOpen, isLateNow, lateTi
                         : <><CheckCircle2 size={16} /> Absen Sekarang</>
                 }
             </button>
-
-            {!data.photo && (
-                <p className="text-xs text-slate-400 text-center">Upload foto selfie terlebih dahulu.</p>
-            )}
-            {isLateNow && data.photo && !data.late_reason && (
-                <p className="text-xs text-amber-500 text-center">Isi alasan keterlambatan terlebih dahulu.</p>
-            )}
         </form>
     );
 }
 
-// ── Main Page ─────────────────────────────────────────────────
+// ── Main Page ──────────────────────────────────────────────────────────────────
 export default function Presensi({
-    todayAttendance,
+    todayAttendance: initialAttendance,
     hasCheckedIn,
     schoolConfig,
     deadline,
@@ -284,10 +267,48 @@ export default function Presensi({
     checkoutOpen,
     checkoutDeadline,
 }) {
-    const [checkingOut, setCheckingOut] = useState(false);
+    const { auth } = usePage().props;
+    const studentId = auth?.student_id;
+
+    const [checkingOut, setCheckingOut]     = useState(false);
+    const [attendance, setAttendance]       = useState(initialAttendance);
+    const [lateNotif, setLateNotif]         = useState(null); // 🔴 notif status izin terlambat
+    const { toasts, addToast, removeToast } = useToast();
+
     const today = new Date().toLocaleDateString('id-ID', {
         weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
     });
+
+    // 🔴 Listen status izin terlambat berubah
+    useEcho(
+        `siswa.${studentId}`,
+        'late-permission.status-changed',
+        useCallback((payload) => {
+            const d = payload.data;
+            const isApproved = d.late_permission_status === 'Approved';
+
+            // Update state attendance lokal agar badge status berubah langsung
+            setAttendance(prev => prev
+                ? { ...prev, late_permission_status: d.late_permission_status }
+                : prev
+            );
+
+            // Banner notif di bawah header
+            setLateNotif({
+                type: isApproved ? 'approved' : 'rejected',
+                message: isApproved
+                    ? '✅ Izin terlambat kamu telah disetujui oleh admin!'
+                    : '❌ Izin terlambat kamu ditolak oleh admin.',
+            });
+
+            // Toast pop-up
+            addToast({
+                type: isApproved ? 'approved' : 'rejected',
+                title: isApproved ? '✅ Izin Terlambat Disetujui' : '❌ Izin Terlambat Ditolak',
+                message: `Tanggal: ${d.date} · Jam masuk: ${d.time_in}`,
+            });
+        }, [addToast])
+    );
 
     const handleCheckout = () => {
         setCheckingOut(true);
@@ -299,6 +320,10 @@ export default function Presensi({
     return (
         <AuthenticatedLayout title="Presensi Hari Ini">
             <FlashMessage />
+
+            {/* Toast real-time */}
+            <RealtimeToast toasts={toasts} onRemove={removeToast} />
+
             <div className="max-w-md mx-auto space-y-4">
 
                 {/* Header dengan jam real-time */}
@@ -316,17 +341,35 @@ export default function Presensi({
                     <h2 className="text-xl font-bold">Presensi Hari Ini</h2>
                     <p className="text-blue-100 text-xs mt-1">
                         {hasCheckedIn
-                            ? `Masuk: ${todayAttendance?.time_in ?? '—'} WIB`
+                            ? `Masuk: ${attendance?.time_in ?? '—'} WIB`
                             : `Tepat waktu s.d. ${lateTime?.slice(0, 5) ?? '07:00'} · Batas ${deadline?.slice(0, 5) ?? '08:00'} WIB`
                         }
                     </p>
                 </div>
 
+                {/*  Banner notif izin terlambat */}
+                {lateNotif && (
+                    <div className={`flex items-center gap-3 px-4 py-3 rounded-2xl border text-sm font-semibold
+                        ${lateNotif.type === 'approved'
+                            ? 'bg-green-50 border-green-200 text-green-700'
+                            : 'bg-red-50 border-red-200 text-red-700'}`}>
+                        {lateNotif.type === 'approved'
+                            ? <CheckCircle2 size={18} />
+                            : <XCircle size={18} />
+                        }
+                        <span className="flex-1">{lateNotif.message}</span>
+                        <button onClick={() => setLateNotif(null)}
+                            className="opacity-60 hover:opacity-100 transition-opacity">
+                            <X size={16} />
+                        </button>
+                    </div>
+                )}
+
                 {/* Kartu konten */}
                 <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
                     {hasCheckedIn
                         ? <AlreadyCheckedIn
-                            attendance={todayAttendance}
+                            attendance={attendance}
                             checkoutOpen={checkoutOpen}
                             onCheckout={handleCheckout}
                             checkingOut={checkingOut}

@@ -2,18 +2,17 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Events\LatePermissionUpdated;
 use App\Http\Controllers\Controller;
 use App\Models\Attendance;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
+use App\Events\LatePermissionStatusChanged;
 
 class LatePermissionController extends Controller
 {
-    /**
-     * GET /admin/izin-terlambat
-     */
     public function index(Request $request): Response
     {
         $statusFilter = $request->query('status', 'Pending');
@@ -53,9 +52,6 @@ class LatePermissionController extends Controller
         ]);
     }
 
-    /**
-     * PATCH /admin/izin-terlambat/{id}
-     */
     public function approve(Request $request, int $id): RedirectResponse
     {
         $request->validate([
@@ -71,6 +67,14 @@ class LatePermissionController extends Controller
             'late_approved_by'       => $request->user()->id,
             'late_approved_at'       => now(),
         ]);
+
+        //  Broadcast ke channel admin.late-permission
+        broadcast(new LatePermissionUpdated(
+            $attendance->fresh(),
+            strtolower($request->action) // 'approved' | 'rejected'
+        ));
+        //  Broadcast ke siswa yang bersangkutan
+        broadcast(new LatePermissionStatusChanged($attendance->fresh()));
 
         $label = $request->action === 'Approved' ? 'disetujui' : 'ditolak';
 

@@ -9,6 +9,7 @@ use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
+use App\Events\PermissionUpdated;
 
 class PermissionController extends Controller
 {
@@ -87,15 +88,18 @@ class PermissionController extends Controller
             $proofPath = $file->storeAs('permissions/proofs', $filename, 'public');
         }
 
-        Permission::create([
-            'student_id'  => $student->id,
-            'type'        => $request->type,
-            'start_date'  => $request->start_date,
-            'end_date'    => $request->end_date,
-            'reason'      => $request->reason,
-            'proof_file'  => $proofPath,
-            'is_approved' => 'Pending',
-        ]);
+        $permission = Permission::create([
+        'student_id'  => $student->id,
+        'type'        => $request->type,
+        'start_date'  => $request->start_date,
+        'end_date'    => $request->end_date,
+        'reason'      => $request->reason,
+        'proof_file'  => $proofPath,
+        'is_approved' => 'Pending',
+    ]);
+
+        //  Broadcast notif izin baru ke admin
+        broadcast(new PermissionUpdated($permission, 'new'));
 
         return redirect()
             ->route('siswa.izin')
