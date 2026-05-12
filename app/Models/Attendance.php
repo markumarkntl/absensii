@@ -7,16 +7,20 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Attendance extends Model
 {
-    protected $fillable = [
-        'student_id', 'date', 'time_in', 'time_out',
-        'status', 'lat_in', 'long_in', 'photo_path', 'note',
-    ];
+   protected $fillable = [
+    'student_id', 'date', 'time_in', 'time_out',
+    'status', 'lat_in', 'long_in', 'photo_path', 'note',
+    'is_late', 'late_permission_status', 'late_approved_by',
+    'late_approved_at', 'late_reason',
+];
 
-    protected $casts = [
-        'date'    => 'date',
-        'lat_in'  => 'decimal:7',
-        'long_in' => 'decimal:7',
-    ];
+protected $casts = [
+    'date'             => 'date',
+    'lat_in'           => 'decimal:7',
+    'long_in'          => 'decimal:7',
+    'is_late'          => 'boolean',
+    'late_approved_at' => 'datetime',
+];
 
     public function student(): BelongsTo
     {

@@ -139,10 +139,25 @@ function ClassAccordion({ kelas, searchQuery }) {
                                             <p className="text-xs text-slate-400 font-mono">{siswa.nisn}</p>
                                         )}
                                     </div>
-                                    <div className="text-right flex-shrink-0">
-                                        <StatusBadge status={siswa.status} />
+                                    <div className="text-right flex-shrink-0 space-y-0.5">
+                                        <div className="flex items-center gap-1.5 justify-end">
+                                            <StatusBadge status={siswa.status} />
+                                            {siswa.is_late && (
+                                                <span className="text-xs bg-amber-100 text-amber-700 border border-amber-200
+                                                                  px-1.5 py-0.5 rounded-full font-semibold">
+                                                    Terlambat
+                                                </span>
+                                            )}
+                                        </div>
                                         {siswa.time_in && (
-                                            <p className="text-xs text-slate-400 mt-0.5">{siswa.time_in}</p>
+                                            <p className="text-xs text-slate-400">
+                                                Masuk: {siswa.time_in}
+                                            </p>
+                                        )}
+                                        {siswa.time_out && (
+                                            <p className="text-xs text-slate-400">
+                                                Pulang: {siswa.time_out}
+                                            </p>
                                         )}
                                     </div>
                                 </div>
@@ -196,10 +211,10 @@ export default function Monitor({
     summary, byClass, recentCheckins,
     classOptions, filterClass, filterStatus, today,
 }) {
-    const [search, setSearch]         = useState('');
-    const [localClass, setLocalClass] = useState(filterClass ?? '');
+    const [search, setSearch]           = useState('');
+    const [localClass, setLocalClass]   = useState(filterClass ?? '');
     const [localStatus, setLocalStatus] = useState(filterStatus ?? '');
-    const [refreshing, setRefreshing] = useState(false);
+    const [refreshing, setRefreshing]   = useState(false);
 
     // Auto-refresh setiap 60 detik
     useEffect(() => {
@@ -232,12 +247,12 @@ export default function Monitor({
     };
 
     const summaryCards = [
-        { icon: Users,         label: 'Total Siswa',  value: summary.total,  color: 'bg-slate-600' },
-        { icon: CheckCircle2,  label: 'Hadir',        value: summary.hadir,  color: 'bg-green-500', sub: `${summary.persenHadir}% kehadiran` },
-        { icon: HeartPulse,    label: 'Sakit',        value: summary.sakit,  color: 'bg-blue-500'  },
-        { icon: FileText,      label: 'Izin',         value: summary.izin,   color: 'bg-purple-500'},
-        { icon: AlertTriangle, label: 'Alfa',         value: summary.alfa,   color: 'bg-red-500'   },
-        { icon: Clock,         label: 'Belum Absen',  value: summary.belum,  color: 'bg-amber-500' },
+        { icon: Users,         label: 'Total Siswa', value: summary.total, color: 'bg-slate-600' },
+        { icon: CheckCircle2,  label: 'Hadir',       value: summary.hadir, color: 'bg-green-500', sub: `${summary.persenHadir}% kehadiran` },
+        { icon: HeartPulse,    label: 'Sakit',       value: summary.sakit, color: 'bg-blue-500'  },
+        { icon: FileText,      label: 'Izin',        value: summary.izin,  color: 'bg-purple-500'},
+        { icon: AlertTriangle, label: 'Alfa',        value: summary.alfa,  color: 'bg-red-500'   },
+        { icon: Clock,         label: 'Belum Absen', value: summary.belum, color: 'bg-amber-500' },
     ];
 
     return (
@@ -245,6 +260,7 @@ export default function Monitor({
             <FlashMessage />
 
             <div className="space-y-5">
+
                 {/* Header */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div>
@@ -292,11 +308,11 @@ export default function Monitor({
                     </div>
                     <div className="flex flex-wrap gap-4 mt-2.5">
                         {[
-                            { label: 'Hadir',       val: summary.hadir, dot: 'bg-green-500'  },
-                            { label: 'Sakit',        val: summary.sakit, dot: 'bg-blue-400'   },
-                            { label: 'Izin',         val: summary.izin,  dot: 'bg-purple-400' },
-                            { label: 'Alfa',         val: summary.alfa,  dot: 'bg-red-400'    },
-                            { label: 'Belum Absen',  val: summary.belum, dot: 'bg-slate-300'  },
+                            { label: 'Hadir',      val: summary.hadir, dot: 'bg-green-500'  },
+                            { label: 'Sakit',      val: summary.sakit, dot: 'bg-blue-400'   },
+                            { label: 'Izin',       val: summary.izin,  dot: 'bg-purple-400' },
+                            { label: 'Alfa',       val: summary.alfa,  dot: 'bg-red-400'    },
+                            { label: 'Belum Absen',val: summary.belum, dot: 'bg-slate-300'  },
                         ].map(({ label, val, dot }) => (
                             <div key={label} className="flex items-center gap-1.5 text-xs text-slate-500">
                                 <span className={`w-2 h-2 rounded-full ${dot}`} />
@@ -369,6 +385,7 @@ export default function Monitor({
 
                 {/* Accordion kelas + live feed */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+
                     {/* Kelas — 2/3 lebar */}
                     <div className="lg:col-span-2 space-y-3">
                         <h3 className="text-sm font-bold text-slate-700 flex items-center gap-2">
@@ -396,6 +413,7 @@ export default function Monitor({
                         <LiveFeed checkins={recentCheckins} />
                         <p className="text-xs text-slate-400 text-center">Auto-refresh setiap 60 detik</p>
                     </div>
+
                 </div>
             </div>
         </AuthenticatedLayout>

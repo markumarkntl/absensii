@@ -45,7 +45,7 @@ class AttendanceService
     {
         $schoolLat     = (float) config('sass.school_lat');
         $schoolLng     = (float) config('sass.school_lng');
-        $allowedRadius = (int)   config('sass.attendance_radius_meters');
+        $allowedRadius = (int) config('sass.attendance_radius_meters');
 
         $distance = $this->calculateDistance($schoolLat, $schoolLng, $studentLat, $studentLng);
 
@@ -115,7 +115,8 @@ class AttendanceService
         StudentDetail $student,
         ?float        $lat,
         ?float        $lng,
-        ?UploadedFile $photo = null
+        ?UploadedFile $photo = null,
+        ?string       $lateReason = null
     ): array {
         // 1. Cek deadline jam absen
         $deadline = Carbon::today()->setTimeFromTimeString(config('sass.attendance_deadline'));
@@ -153,21 +154,42 @@ class AttendanceService
             $photoPath = $this->storeSelfie($photo, $student->id);
         }
 
-        // 5. Buat record absensi
+        // 5. Deteksi terlambat
+        $lateTime = Carbon::today()->setTimeFromTimeString(config('sass.attendance_late', '07:00:00'));
+        $isLate   = now()->gt($lateTime);
+
+        // Jika terlambat wajib ada alasan
+        if ($isLate && empty($lateReason)) {
+            return [
+                'success' => false,
+                'is_late' => true,
+                'message' => 'Kamu terlambat! Silakan isi alasan keterlambatan.',
+            ];
+        }
+
+        // 6. Buat record absensi
         $attendance = Attendance::create([
-            'student_id' => $student->id,
-            'date'       => today(),
-            'time_in'    => now()->format('H:i:s'),
-            'status'     => 'Hadir',
-            'lat_in'     => $lat,
-            'long_in'    => $lng,
-            'photo_path' => $photoPath,
+            'student_id'             => $student->id,
+            'date'                   => today(),
+            'time_in'                => now()->format('H:i:s'),
+            'status'                 => 'Hadir',
+            'lat_in'                 => $lat,
+            'long_in'                => $lng,
+            'photo_path'             => $photoPath,
+            'is_late'                => $isLate,
+            'late_permission_status' => $isLate ? 'Pending' : null,
+            'late_reason'            => $isLate ? $lateReason : null,
         ]);
+
+        $message = $isLate
+            ? 'Absen berhasil. Izin hadir terlambat sudah dikirim ke admin.'
+            : 'Absen berhasil! Selamat belajar.';
 
         return [
             'success'    => true,
-            'message'    => 'Absen berhasil! Selamat belajar.',
+            'message'    => $message,
             'attendance' => $attendance,
+            'is_late'    => $isLate,
         ];
     }
 
@@ -191,6 +213,40 @@ class AttendanceService
             'alfa'  => $attendances->where('status', 'Alfa')->count(),
         ];
     }
+
+    public function checkOut(StudentDetail $student): array
+{
+    $attendance = $this->getTodayAttendance($student);
+
+    if (! $attendance) {
+        return [
+            'success' => false,
+            'message' => 'Kamu belum melakukan absen masuk hari ini.',
+        ];
+    }
+
+    if ($attendance->time_out) {
+        return [
+            'success' => false,
+            'message' => 'Kamu sudah melakukan absen pulang hari ini.',
+        ];
+    }
+
+    $checkoutOpen = Carbon::today()->setTimeFromTimeString(config('sass.checkout_open', '14:00:00'));
+    if (now()->lt($checkoutOpen)) {
+        return [
+            'success' => false,
+            'message' => 'Absen pulang baru bisa dilakukan mulai pukul ' . $checkoutOpen->format('H:i') . ' WIB.',
+        ];
+    }
+
+    $attendance->update(['time_out' => now()->format('H:i:s')]);
+
+    return [
+        'success' => true,
+        'message' => 'Absen pulang berhasil! Hati-hati di jalan.',
+    ];
+}
     // -------------------------------------------------------------------------
     // STATISTIK & RIWAYAT
     // -------------------------------------------------------------------------

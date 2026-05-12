@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
-import { usePage, Link, router } from '@inertiajs/react';
+import { usePage, Link, router, Head } from '@inertiajs/react';
 import {
     LayoutDashboard, ClipboardCheck, CalendarDays,
     FileText, IdCard, Users, BookOpen, ShieldCheck,
     BarChart3, MonitorCheck, Menu, X, LogOut,
-    ChevronRight, Bell
+    ChevronRight, Bell, AlarmClock
 } from 'lucide-react';
 
 // ── Menu config ────────────────────────────────────────────
@@ -17,18 +17,19 @@ const studentMenu = [
 ];
 
 const adminMenu = [
-    { label: 'Dashboard',         href: '/admin/dashboard', icon: LayoutDashboard  },
-    { label: 'Monitor Real-time', href: '/admin/monitor',   icon: MonitorCheck     },
-    { label: 'Data Siswa',        href: '/admin/siswa',     icon: Users            },
-    { label: 'Data Kelas',        href: '/admin/kelas',     icon: BookOpen         },
-    { label: 'Approval Izin',     href: '/admin/izin',      icon: ShieldCheck      },
-    { label: 'Laporan',           href: '/admin/laporan',   icon: BarChart3        },
+    { label: 'Dashboard',        href: '/admin/dashboard',      icon: LayoutDashboard },
+    { label: 'Monitor Real-time',href: '/admin/monitor',        icon: MonitorCheck    },
+    { label: 'Data Siswa',       href: '/admin/siswa',          icon: Users           },
+    { label: 'Data Kelas',       href: '/admin/kelas',          icon: BookOpen        },
+    { label: 'Approval Izin',    href: '/admin/izin',           icon: ShieldCheck     },
+    { label: 'Izin Terlambat',   href: '/admin/izin-terlambat', icon: AlarmClock      },
+    { label: 'Laporan',          href: '/admin/laporan',        icon: BarChart3       },
 ];
 
 // ── NavItem ────────────────────────────────────────────────
 function NavItem({ item, currentPath, collapsed }) {
     const Icon    = item.icon;
-    const isActive = currentPath.startsWith(item.href);
+    const isActive = currentPath === item.href || currentPath.startsWith(item.href + '/');
 
     return (
         <Link
@@ -216,7 +217,9 @@ export default function AuthenticatedLayout({ children, title = 'Dashboard' }) {
         setMobileOpen(false);
     }, [url]);
 
-    return (
+return (
+    <>
+        <Head title={`${title} — Absenku`} />
         <div className="flex h-screen bg-slate-50 overflow-hidden">
             <Sidebar
                 collapsed={collapsed}
@@ -234,5 +237,6 @@ export default function AuthenticatedLayout({ children, title = 'Dashboard' }) {
                 </main>
             </div>
         </div>
+    </>
     );
 }

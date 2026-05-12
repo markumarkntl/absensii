@@ -67,38 +67,45 @@ class MonitorController extends Controller
         }
 
         $classes = $classesQuery->get()->map(function (Classroom $classroom) use ($todayAttendances, $statusFilter) {
-            $students = $classroom->students->map(function (StudentDetail $student) use ($todayAttendances) {
-                $att = $todayAttendances->get($student->id);
+    $students = $classroom->students->map(function (StudentDetail $student) use ($todayAttendances) {
+        $att = $todayAttendances->get($student->id);
 
-                return [
-                    'id'       => $student->id,
-                    'name'     => $student->user?->name ?? '-',
-                    'nisn'     => $student->nisn,
-                    'status'   => $att?->status ?? 'Belum',
-                    'time_in'  => $att?->time_in,
-                    'time_out' => $att?->time_out,
-                    'note'     => $att?->note,
-                ];
-            });
+        return [
+            'id'                     => $student->id,
+            'name'                   => $student->user?->name ?? '-',
+            'nisn'                   => $student->nisn,
+            'status'                 => $att?->status ?? 'Belum',
+            'time_in'                => $att?->time_in,
+            'time_out'               => $att?->time_out,
+            'note'                   => $att?->note,
+            'is_late'                => $att?->is_late ?? false,
+            'late_permission_status' => $att?->late_permission_status,
+        ];
+    });
 
-            $total = $students->count();
-            $hadir = $students->where('status', 'Hadir')->count();
+    $total = $students->count();
+    $hadir = $students->where('status', 'Hadir')->count();
 
-            // Filter status untuk tampilan (hitung statistik dulu, baru filter)
-            $filtered = $statusFilter
-                ? $students->filter(fn ($s) => $s['status'] === $statusFilter)->values()
-                : $students->values();
+    // Filter status — 'Belum' tidak ada di DB jadi harus filter di PHP
+    $filtered = $statusFilter
+        ? $students->filter(fn ($s) => $s['status'] === $statusFilter)->values()
+        : $students->values();
 
-            return [
-                'id'       => $classroom->id,
-                'name'     => $classroom->nama_kelas,
-                'jurusan'  => $classroom->jurusan,
-                'total'    => $total,
-                'hadir'    => $hadir,
-                'persen'   => $total > 0 ? round(($hadir / $total) * 100) : 0,
-                'students' => $filtered,
-            ];
-        });
+    return [
+        'id'       => $classroom->id,
+        'name'     => $classroom->nama_kelas,
+        'jurusan'  => $classroom->jurusan,
+        'total'    => $total,
+        'hadir'    => $hadir,
+        'persen'   => $total > 0 ? round(($hadir / $total) * 100) : 0,
+        'students' => $filtered,
+    ];
+});
+
+// Jika filter Belum, sembunyikan kelas yang tidak punya siswa belum absen
+if ($statusFilter === 'Belum') {
+    $classes = $classes->filter(fn ($k) => count($k['students']) > 0);
+}
 
         // ── Recent check-ins (live feed) ──────────────────────────────────────
         $recentCheckins = Attendance::with(['student.user', 'student.classroom'])
