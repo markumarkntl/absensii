@@ -33,26 +33,6 @@ class RoleAndAdminSeeder extends Seeder
             ['status_aktif' => true]
         );
 
-        // ── 4. Data Sample Kelas ──────────────────────────────────────────────
-        $kelasData = [
-            ['nama_kelas' => 'X RPL 1',   'jurusan' => 'Rekayasa Perangkat Lunak'],
-            ['nama_kelas' => 'X RPL 2',   'jurusan' => 'Rekayasa Perangkat Lunak'],
-            ['nama_kelas' => 'XI RPL 1',  'jurusan' => 'Rekayasa Perangkat Lunak'],
-            ['nama_kelas' => 'XI RPL 2',  'jurusan' => 'Rekayasa Perangkat Lunak'],
-            ['nama_kelas' => 'XII RPL 1', 'jurusan' => 'Rekayasa Perangkat Lunak'],
-            ['nama_kelas' => 'XII RPL 2', 'jurusan' => 'Rekayasa Perangkat Lunak'],
-        ];
-
-        foreach ($kelasData as $kelas) {
-            Classroom::firstOrCreate(
-                [
-                    'nama_kelas'       => $kelas['nama_kelas'],
-                    'academic_year_id' => $academicYear->id,
-                ],
-                ['jurusan' => $kelas['jurusan']]
-            );
-        }
-
         $this->command->info('✅ Role, admin, tahun ajaran, dan kelas berhasil dibuat.');
         $this->command->info('   Admin login: admin@sekolah.com / password');
     }

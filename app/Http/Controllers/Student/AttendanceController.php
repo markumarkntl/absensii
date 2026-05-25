@@ -70,7 +70,7 @@ class AttendanceController extends Controller
             return back()->with('error', $result['message']);
         }
 
-        // 🔴 Broadcast event check-in ke admin
+        // Broadcast event check-in ke admin
         $attendance = $this->attendanceService->getTodayAttendance($student);
         if ($attendance) {
             broadcast(new AttendanceCheckedIn($attendance));
@@ -91,7 +91,7 @@ class AttendanceController extends Controller
             return back()->with('error', $result['message']);
         }
 
-        //  Broadcast event check-out ke admin
+        // Broadcast event check-out ke admin
         $attendance = $this->attendanceService->getTodayAttendance($student);
         if ($attendance) {
             broadcast(new AttendanceCheckedOut($attendance));
@@ -112,8 +112,28 @@ class AttendanceController extends Controller
         $year  = max(2020, min($year,  now()->year));
         $month = max(1,    min($month, 12));
 
-        $history = $this->attendanceService->getMonthlyHistory($student, $year, $month);
-        $stats   = $this->attendanceService->getMonthlyStats($student, $year, $month);
+        $history = $this->attendanceService->getMonthlyHistory($student, $year, $month)
+            ->map(function ($att) {
+                // Format tanggal agar tampil benar di frontend
+                $date = \Carbon\Carbon::parse($att->date);
+                return [
+                    'id'             => $att->id,
+                    'date'           => $att->date,
+                    'date_formatted' => $date->translatedFormat('d M Y'), // contoh: "12 Mei 2026"
+                    'day_name'       => $date->translatedFormat('l'),      // contoh: "Senin"
+                    'time_in'        => $att->time_in
+                                          ? \Carbon\Carbon::parse($att->time_in)->format('H:i')
+                                          : null,
+                    'time_out'       => $att->time_out
+                                          ? \Carbon\Carbon::parse($att->time_out)->format('H:i')
+                                          : null,
+                    'status'         => $att->status,
+                    'photo_path'     => $att->photo_path,
+                    'note'           => $att->note,
+                ];
+            });
+
+        $stats = $this->attendanceService->getMonthlyStats($student, $year, $month);
 
         return Inertia::render('Siswa/Riwayat', [
             'history'      => $history,

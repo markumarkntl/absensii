@@ -17,16 +17,19 @@ class MonitorController extends Controller
      *
      * Tampilkan monitor real-time absensi hari ini.
      * Data yang dikirim:
-     *  - summary       : ringkasan Hadir / Sakit / Izin / Alfa / Belum Absen
-     *  - byClass       : daftar kelas + status tiap siswa hari ini
-     *  - recentCheckins: 15 check-in terbaru (untuk live feed)
-     *  - filterClass   : nilai filter kelas aktif (dari query string)
+     *  - summary        : ringkasan Hadir / Sakit / Izin / Alfa / Belum Absen
+     *  - byClass        : daftar kelas + status tiap siswa hari ini
+     *  - recentCheckins : 15 check-in terbaru (untuk live feed)
+     *  - filterClass    : nilai filter kelas aktif
+     *  - filterStatus   : nilai filter status aktif
+     *  - search         : kata kunci pencarian nama siswa
      */
     public function index(Request $request): Response
     {
         $today        = today()->toDateString();
         $classId      = $request->query('kelas');
         $statusFilter = $request->query('status');
+        $search       = trim((string) $request->query('search', ''));
 
         // ── Ringkasan global hari ini ─────────────────────────────────────────
         $totalSiswa = StudentDetail::count();
@@ -53,8 +56,7 @@ class MonitorController extends Controller
             'persenHadir' => $totalSiswa > 0 ? round(($totalHadir / $totalSiswa) * 100) : 0,
         ];
 
-        // ── Ambil semua absensi hari ini sekaligus, index by student_id ─────────
-        // Lebih reliable daripada nested eager loading dengan constraint
+        // ── Ambil semua absensi hari ini, index by student_id ─────────────────
         $todayAttendances = Attendance::whereDate('date', $today)
             ->get()
             ->keyBy('student_id');
@@ -66,46 +68,64 @@ class MonitorController extends Controller
             $classesQuery->where('id', $classId);
         }
 
-        $classes = $classesQuery->get()->map(function (Classroom $classroom) use ($todayAttendances, $statusFilter) {
-    $students = $classroom->students->map(function (StudentDetail $student) use ($todayAttendances) {
-        $att = $todayAttendances->get($student->id);
+        $classes = $classesQuery->get()->map(function (Classroom $classroom) use (
+            $todayAttendances,
+            $statusFilter,
+            $search
+        ) {
+            $students = $classroom->students->map(function (StudentDetail $student) use ($todayAttendances) {
+                $att = $todayAttendances->get($student->id);
 
-        return [
-            'id'                     => $student->id,
-            'name'                   => $student->user?->name ?? '-',
-            'nisn'                   => $student->nisn,
-            'status'                 => $att?->status ?? 'Belum',
-            'time_in'                => $att?->time_in,
-            'time_out'               => $att?->time_out,
-            'note'                   => $att?->note,
-            'is_late'                => $att?->is_late ?? false,
-            'late_permission_status' => $att?->late_permission_status,
-        ];
-    });
+                return [
+                    'id'                     => $student->id,
+                    'name'                   => $student->user?->name ?? '-',
+                    'nisn'                   => $student->nisn,
+                    'status'                 => $att?->status ?? 'Belum',
+                    'time_in'                => $att?->time_in,
+                    'time_out'               => $att?->time_out,
+                    'note'                   => $att?->note,
+                    'is_late'                => $att?->is_late ?? false,
+                    'late_permission_status' => $att?->late_permission_status,
+                ];
+            });
 
-    $total = $students->count();
-    $hadir = $students->where('status', 'Hadir')->count();
+            // Filter nama siswa (search)
+            if ($search !== '') {
+                $students = $students->filter(
+                    fn ($s) => str_contains(strtolower($s['name']), strtolower($search))
+                );
+            }
 
-    // Filter status — 'Belum' tidak ada di DB jadi harus filter di PHP
-    $filtered = $statusFilter
-        ? $students->filter(fn ($s) => $s['status'] === $statusFilter)->values()
-        : $students->values();
+            // Filter status — 'Belum' tidak ada di DB jadi filter di PHP
+            if ($statusFilter) {
+                $students = $students->filter(fn ($s) => $s['status'] === $statusFilter);
+            }
 
-    return [
-        'id'       => $classroom->id,
-        'name'     => $classroom->nama_kelas,
-        'jurusan'  => $classroom->jurusan,
-        'total'    => $total,
-        'hadir'    => $hadir,
-        'persen'   => $total > 0 ? round(($hadir / $total) * 100) : 0,
-        'students' => $filtered,
-    ];
-});
+            $students = $students->values();
 
-// Jika filter Belum, sembunyikan kelas yang tidak punya siswa belum absen
-if ($statusFilter === 'Belum') {
-    $classes = $classes->filter(fn ($k) => count($k['students']) > 0);
-}
+            $total = $classroom->students->count();
+            $hadir = $todayAttendances
+                ->filter(fn ($a) =>
+                    $classroom->students->pluck('id')->contains($a->student_id)
+                    && $a->status === 'Hadir'
+                )
+                ->count();
+
+            return [
+                'id'       => $classroom->id,
+                'name'     => $classroom->nama_kelas,
+                'jurusan'  => $classroom->jurusan,
+                'total'    => $total,
+                'hadir'    => $hadir,
+                'persen'   => $total > 0 ? round(($hadir / $total) * 100) : 0,
+                'students' => $students,
+            ];
+        });
+
+        // Sembunyikan kelas tanpa siswa yang match filter
+        if ($statusFilter || $search !== '') {
+            $classes = $classes->filter(fn ($k) => count($k['students']) > 0);
+        }
 
         // ── Recent check-ins (live feed) ──────────────────────────────────────
         $recentCheckins = Attendance::with(['student.user', 'student.classroom'])
@@ -134,6 +154,7 @@ if ($statusFilter === 'Belum') {
             'classOptions'   => $classOptions,
             'filterClass'    => $classId ? (int) $classId : null,
             'filterStatus'   => $statusFilter,
+            'search'         => $search,
             'today'          => today()->translatedFormat('l, d F Y'),
         ]);
     }

@@ -214,23 +214,23 @@ export default function Monitor({
     classOptions,
     filterClass,
     filterStatus,
+    search: initialSearch,
     today,
 }) {
-    const [search, setSearch]         = useState('');
-    const [localClass, setLocalClass] = useState(filterClass ?? '');
+    const [search, setSearch]           = useState(initialSearch ?? '');
+    const [localClass, setLocalClass]   = useState(filterClass ?? '');
     const [localStatus, setLocalStatus] = useState(filterStatus ?? '');
-    const [refreshing, setRefreshing] = useState(false);
+    const [refreshing, setRefreshing]   = useState(false);
 
-    // 🔴 State real-time
-    const [summary, setSummary]         = useState(initialSummary);
-    const [checkins, setCheckins]       = useState(initialCheckins);
+    // State real-time
+    const [summary, setSummary]   = useState(initialSummary);
+    const [checkins, setCheckins] = useState(initialCheckins);
     const { toasts, addToast, removeToast } = useToast();
 
-    // 🔴 Listen event check-in
+    // Listen event check-in
     useEcho('admin.attendance', 'attendance.checked-in', useCallback((payload) => {
         const d = payload.data;
 
-        // Tambah ke live feed (paling atas, max 15)
         setCheckins(prev => {
             const exists = prev.find(c => c.id === d.id);
             if (exists) return prev;
@@ -244,7 +244,6 @@ export default function Monitor({
             ].slice(0, 15);
         });
 
-        // Update summary counter
         setSummary(prev => ({
             ...prev,
             hadir: prev.hadir + 1,
@@ -254,7 +253,6 @@ export default function Monitor({
                 : 0,
         }));
 
-        // Toast notifikasi
         addToast({
             type: d.is_late ? 'terlambat' : 'check-in',
             title: d.is_late ? '⚠️ Siswa Terlambat' : '✅ Siswa Check-in',
@@ -262,11 +260,10 @@ export default function Monitor({
         });
     }, [addToast]));
 
-    // 🔴 Listen event check-out
+    // Listen event check-out
     useEcho('admin.attendance', 'attendance.checked-out', useCallback((payload) => {
         const d = payload.data;
 
-        // Update time_out di live feed
         setCheckins(prev =>
             prev.map(c => c.id === d.id ? { ...c, time_out: d.time_out } : c)
         );
@@ -297,7 +294,11 @@ export default function Monitor({
     const applyFilter = () => {
         router.get(
             route('admin.monitor'),
-            { kelas: localClass || undefined, status: localStatus || undefined },
+            {
+                kelas:  localClass  || undefined,
+                status: localStatus || undefined,
+                search: search      || undefined,
+            },
             { preserveState: true, replace: true }
         );
     };
@@ -305,6 +306,7 @@ export default function Monitor({
     const resetFilter = () => {
         setLocalClass('');
         setLocalStatus('');
+        setSearch('');
         router.get(route('admin.monitor'), {}, { preserveState: true, replace: true });
     };
 
@@ -312,7 +314,7 @@ export default function Monitor({
         { icon: Users,         label: 'Total Siswa', value: summary.total, color: 'bg-slate-600' },
         { icon: CheckCircle2,  label: 'Hadir',       value: summary.hadir, color: 'bg-green-500', sub: `${summary.persenHadir}% kehadiran` },
         { icon: HeartPulse,    label: 'Sakit',       value: summary.sakit, color: 'bg-blue-500'  },
-        { icon: FileText,      label: 'Izin',        value: summary.izin,  color: 'bg-purple-500'},
+        { icon: FileText,      label: 'Izin',        value: summary.izin,  color: 'bg-purple-500' },
         { icon: AlertTriangle, label: 'Alfa',        value: summary.alfa,  color: 'bg-red-500'   },
         { icon: Clock,         label: 'Belum Absen', value: summary.belum, color: 'bg-amber-500' },
     ];
@@ -321,7 +323,6 @@ export default function Monitor({
         <AuthenticatedLayout title="Monitor Real-time">
             <FlashMessage />
 
-            {/*  Toast real-time pojok kanan bawah */}
             <RealtimeToast toasts={toasts} onRemove={removeToast} />
 
             <div className="space-y-5">
@@ -353,7 +354,7 @@ export default function Monitor({
                     {summaryCards.map(c => <SummaryCard key={c.label} {...c} />)}
                 </div>
 
-                {/* Progress bar */}
+                {/* Progress bar komposisi */}
                 <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
                     <div className="flex items-center justify-between mb-2">
                         <p className="text-sm font-semibold text-slate-700">Komposisi Kehadiran Hari Ini</p>
@@ -363,7 +364,7 @@ export default function Monitor({
                         {[
                             { val: summary.hadir, color: 'bg-green-500' },
                             { val: summary.sakit, color: 'bg-blue-400'  },
-                            { val: summary.izin,  color: 'bg-purple-400'},
+                            { val: summary.izin,  color: 'bg-purple-400' },
                             { val: summary.alfa,  color: 'bg-red-400'   },
                             { val: summary.belum, color: 'bg-slate-200' },
                         ].map(({ val, color }, i) =>
@@ -392,7 +393,7 @@ export default function Monitor({
                     </div>
                 </div>
 
-                {/* Filter */}
+                {/* Filter & Search */}
                 <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm flex flex-wrap gap-3 items-end">
                     <div className="flex-1 min-w-40">
                         <label className="text-xs font-semibold text-slate-600 mb-1 block">Kelas</label>
@@ -415,19 +416,11 @@ export default function Monitor({
                             className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                         >
                             <option value="">Semua Status</option>
-                            {['Hadir','Sakit','Izin','Alfa','Belum'].map(s => (
+                            {['Hadir', 'Sakit', 'Izin', 'Alfa', 'Belum'].map(s => (
                                 <option key={s} value={s}>{s}</option>
                             ))}
                         </select>
                     </div>
-                    <button onClick={applyFilter}
-                        className="px-4 py-2 rounded-lg text-sm font-semibold bg-blue-600 text-white hover:bg-blue-700 transition-colors">
-                        Filter
-                    </button>
-                    <button onClick={resetFilter}
-                        className="px-4 py-2 rounded-lg text-sm font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors">
-                        Reset
-                    </button>
                     <div className="flex-1 min-w-48">
                         <label className="text-xs font-semibold text-slate-600 mb-1 block">Cari Siswa</label>
                         <input
@@ -435,9 +428,22 @@ export default function Monitor({
                             placeholder="Nama / NISN..."
                             value={search}
                             onChange={e => setSearch(e.target.value)}
+                            onKeyDown={e => e.key === 'Enter' && applyFilter()}
                             className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                         />
                     </div>
+                    <button
+                        onClick={applyFilter}
+                        className="px-4 py-2 rounded-lg text-sm font-semibold bg-blue-600 text-white hover:bg-blue-700 transition-colors"
+                    >
+                        Filter
+                    </button>
+                    <button
+                        onClick={resetFilter}
+                        className="px-4 py-2 rounded-lg text-sm font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors"
+                    >
+                        Reset
+                    </button>
                 </div>
 
                 {/* Content grid */}
@@ -446,7 +452,7 @@ export default function Monitor({
                     <div className="lg:col-span-2 space-y-3">
                         {byClass.length === 0 ? (
                             <div className="bg-white rounded-2xl border border-slate-200 p-8 text-center">
-                                <p className="text-slate-400 text-sm">Tidak ada data kelas.</p>
+                                <p className="text-slate-400 text-sm">Tidak ada data yang cocok.</p>
                             </div>
                         ) : (
                             byClass.map(k => (
